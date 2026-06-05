@@ -5,7 +5,7 @@
 import logging
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal
-from models import Base, User, Book, Author, Publisher
+from models import Base, User, Book, Author, Publisher, MemberLevel
 from auth import get_password_hash
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +46,50 @@ def seed_data():
             is_active=True
         )
         db.add(user)
+
+        # 创建默认会员等级
+        member_levels = [
+            MemberLevel(
+                name="普通会员",
+                threshold_amount=0.0,
+                discount_rate=1.0,
+                benefits="基础会员权益，享受标准价格",
+                badge_color="#909399",
+                sort_order=1,
+                is_active=True
+            ),
+            MemberLevel(
+                name="银卡会员",
+                threshold_amount=500.0,
+                discount_rate=0.95,
+                benefits="享受95折优惠，生日特权通知，专属客服",
+                badge_color="#C0C0C0",
+                sort_order=2,
+                is_active=True
+            ),
+            MemberLevel(
+                name="金卡会员",
+                threshold_amount=2000.0,
+                discount_rate=0.9,
+                benefits="享受9折优惠，优先发货，生日双倍积分",
+                badge_color="#FFD700",
+                sort_order=3,
+                is_active=True
+            ),
+            MemberLevel(
+                name="钻石会员",
+                threshold_amount=5000.0,
+                discount_rate=0.85,
+                benefits="享受85折优惠，免费包邮，专属客服经理",
+                badge_color="#B9F2FF",
+                sort_order=4,
+                is_active=True
+            )
+        ]
+        for level in member_levels:
+            db.add(level)
+
+        db.flush()
 
         # 创建示例作者
         authors = [

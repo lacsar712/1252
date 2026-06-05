@@ -81,10 +81,16 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    total_spent: float = 0.0
+    manual_level_id: Optional[int] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserMemberResponse(UserResponse):
+    member_level: Optional[UserMemberLevelInfo] = None
 
 
 class Token(BaseModel):
@@ -268,9 +274,11 @@ class OrderItemSnapshot(BaseModel):
     book_title: str
     book_author: str
     book_price: float
+    book_member_price: float = 0.0
     book_cover: Optional[str] = None
     quantity: int
     subtotal: float
+    member_subtotal: float = 0.0
 
 
 class OrderCreate(BaseModel):
@@ -309,6 +317,7 @@ class OrderResponse(BaseModel):
     total_amount: float
     original_amount: float
     discount_amount: float
+    member_discount_amount: float = 0.0
     user_coupon_id: Optional[int] = None
     status: str
     receiver_name: str
@@ -322,6 +331,9 @@ class OrderResponse(BaseModel):
     paid_at: Optional[datetime] = None
     shipped_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
+    member_level_id: Optional[int] = None
+    member_level_name: Optional[str] = None
+    member_discount_rate: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     items: List[OrderItemSnapshot]
@@ -628,3 +640,80 @@ class BookListListResponse(BaseModel):
     page: int
     page_size: int
     items: List[BookListResponse]
+
+
+# ========== 会员等级相关 Schema ==========
+class MemberLevelBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50, description="等级名称")
+    threshold_amount: float = Field(0.0, ge=0, description="升级门槛（累计消费金额）")
+    discount_rate: float = Field(1.0, gt=0, le=1, description="折扣比例（0~1，如0.9表示9折）")
+    benefits: Optional[str] = Field(None, description="权益描述")
+    badge_color: Optional[str] = Field(None, max_length=20, description="等级标识颜色")
+    icon: Optional[str] = Field(None, max_length=500, description="图标URL")
+    sort_order: int = Field(0, ge=0, description="排序权重")
+    is_active: bool = Field(True, description="启用状态")
+
+
+class MemberLevelCreate(MemberLevelBase):
+    pass
+
+
+class MemberLevelUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=50, description="等级名称")
+    threshold_amount: Optional[float] = Field(None, ge=0, description="升级门槛")
+    discount_rate: Optional[float] = Field(None, gt=0, le=1, description="折扣比例")
+    benefits: Optional[str] = Field(None, description="权益描述")
+    badge_color: Optional[str] = Field(None, max_length=20, description="等级标识颜色")
+    icon: Optional[str] = Field(None, max_length=500, description="图标URL")
+    sort_order: Optional[int] = Field(None, ge=0, description="排序权重")
+    is_active: Optional[bool] = Field(None, description="启用状态")
+
+
+class MemberLevelResponse(MemberLevelBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MemberLevelListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[MemberLevelResponse]
+
+
+class UserMemberLevelInfo(BaseModel):
+    user_id: int
+    total_spent: float
+    current_level: Optional[MemberLevelResponse] = None
+    next_level: Optional[MemberLevelResponse] = None
+    amount_to_next: float = Field(0.0, description="距离下一等级的差额")
+    manual_level: Optional[MemberLevelResponse] = None
+    is_manual: bool = Field(False, description="是否为管理员手动设置等级")
+
+
+class UserMemberLevelUpdate(BaseModel):
+    manual_level_id: Optional[int] = Field(None, description="手动设置的会员等级ID，传null则清除手动设置")
+
+
+class MemberPriceInfo(BaseModel):
+    original_price: float
+    member_price: float
+    discount_rate: float
+    level_name: Optional[str] = None
+
+
+class BookMemberPriceResponse(BaseModel):
+    book_id: int
+    price_info: MemberPriceInfo
+
+
+class OrderPriceBreakdown(BaseModel):
+    original_total: float
+    member_discount: float
+    coupon_discount: float
+    final_total: float
+    member_level_name: Optional[str] = None

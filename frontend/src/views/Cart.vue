@@ -98,6 +98,9 @@
 
             <div class="item-price">
               <span class="price-value">¥{{ item.book.price.toFixed(2) }}</span>
+              <span v-if="memberLevelInfo?.current_level && memberLevelInfo.current_level.discount_rate < 1" class="member-price">
+                会员价 ¥{{ (item.book.price * memberLevelInfo.current_level.discount_rate).toFixed(2) }}
+              </span>
             </div>
 
             <div class="item-quantity">
@@ -111,7 +114,11 @@
             </div>
 
             <div class="item-subtotal">
-              <span class="subtotal-value">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
+              <div v-if="memberLevelInfo?.current_level && memberLevelInfo.current_level.discount_rate < 1">
+                <span class="subtotal-value member">¥{{ (item.quantity * item.book.price * memberLevelInfo.current_level.discount_rate).toFixed(2) }}</span>
+                <span class="original-subtotal">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
+              </div>
+              <span v-else class="subtotal-value">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
             </div>
 
             <div class="item-action">
@@ -220,12 +227,12 @@
           
           <div class="summary-row total-row">
             <span>商品总价：</span>
-            <span class="total-price">¥{{ cartStore.totalPrice.toFixed(2) }}</span>
+            <span class="total-price">¥{{ cartStore.selectedPrice.toFixed(2) }}</span>
           </div>
           
-          <div class="summary-row selected-row">
-            <span>已选商品：</span>
-            <span class="selected-price">¥{{ cartStore.selectedPrice.toFixed(2) }}</span>
+          <div v-if="memberDiscount > 0" class="summary-row member-discount-row">
+            <span>会员优惠：</span>
+            <span class="member-discount">-¥{{ memberDiscount.toFixed(2) }}</span>
           </div>
 
           <el-divider />
@@ -233,7 +240,10 @@
           <div class="summary-footer">
             <div class="footer-total">
               <span>合计：</span>
-              <span class="footer-price">¥{{ cartStore.selectedPrice.toFixed(2) }}</span>
+              <span class="footer-price">¥{{ finalPrice.toFixed(2) }}</span>
+            </div>
+            <div v-if="memberDiscount > 0" class="saved-info">
+              已优惠 ¥{{ memberDiscount.toFixed(2) }}
             </div>
             
             <el-button
@@ -263,11 +273,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
-import type { CartItem } from '@/types'
+import type { CartItem, UserMemberLevelInfo } from '@/types'
+import { api } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Delete,
@@ -279,6 +290,19 @@ const cartStore = useCartStore()
 const userStore = useUserStore()
 
 const defaultCover = 'https://via.placeholder.com/120x160/6366f1/ffffff?text=Book'
+const memberLevelInfo = ref<UserMemberLevelInfo | null>(null)
+
+const memberDiscount = computed(() => {
+  if (!memberLevelInfo.value?.current_level || memberLevelInfo.value.current_level.discount_rate >= 1) {
+    return 0
+  }
+  const discountRate = memberLevelInfo.value.current_level.discount_rate
+  return cartStore.selectedPrice * (1 - discountRate)
+})
+
+const finalPrice = computed(() => {
+  return cartStore.selectedPrice - memberDiscount.value
+})
 
 onMounted(async () => {
   await checkLoginAndFetch()
@@ -290,7 +314,19 @@ async function checkLoginAndFetch() {
     router.push({ name: 'Login', query: { redirect: '/cart' } })
     return
   }
-  await cartStore.fetchCart()
+  await Promise.all([
+    cartStore.fetchCart(),
+    fetchMemberLevel()
+  ])
+}
+
+async function fetchMemberLevel() {
+  try {
+    memberLevelInfo.value = await api.getMyMemberLevel()
+  } catch (error) {
+    console.error('获取会员等级信息失败:', error)
+    memberLevelInfo.value = null
+  }
 }
 
 function isLowStock(item: CartItem): boolean {
@@ -757,5 +793,49 @@ function handleCheckout() {
     grid-column: 2;
     grid-row: 3;
   }
+}
+
+.item-price {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.member-price {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--warning-color);
+}
+
+.item-subtotal {
+  text-align: center;
+}
+
+.original-subtotal {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.subtotal-value.member {
+  color: var(--danger-color);
+}
+
+.member-discount-row {
+  color: var(--warning-color);
+}
+
+.member-discount {
+  font-weight: 600;
+  color: var(--danger-color);
+}
+
+.saved-info {
+  text-align: right;
+  font-size: 13px;
+  color: var(--danger-color);
+  margin-bottom: 12px;
 }
 </style>

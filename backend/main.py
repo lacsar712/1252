@@ -24,6 +24,7 @@ from routes.messages import router as messages_router
 from routes.admin_messages import router as admin_messages_router
 from routes.dashboard import router as dashboard_router
 from routes.book_lists import router as book_lists_router
+from routes.member_levels import router as member_levels_router
 
 # 配置日志
 logging.basicConfig(
@@ -87,6 +88,7 @@ app.include_router(messages_router)
 app.include_router(admin_messages_router)
 app.include_router(dashboard_router)
 app.include_router(book_lists_router)
+app.include_router(member_levels_router)
 
 # 挂载静态文件
 # 确保static目录存在

@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     Order, OrderItem, CartItem, Book, User, OrderStatus,
-    UserCoupon, UserCouponStatus, Coupon, CouponStatus
+    UserCoupon, UserCouponStatus, Coupon, CouponStatus,
+    MemberLevel
 )
 from schemas import (
     OrderResponse,
@@ -40,6 +41,27 @@ def _generate_order_no() -> str:
     return f"ORD{timestamp}{random_num}"
 
 
+def _get_user_member_level(db: Session, user: User) -> Optional[MemberLevel]:
+    """获取用户的会员等级"""
+    if user.manual_level_id:
+        manual_level = db.query(MemberLevel).filter(
+            MemberLevel.id == user.manual_level_id,
+            MemberLevel.is_active == True
+        ).first()
+        if manual_level:
+            return manual_level
+
+    active_levels = db.query(MemberLevel).filter(
+        MemberLevel.is_active == True
+    ).order_by(MemberLevel.threshold_amount.desc()).all()
+
+    for level in active_levels:
+        if user.total_spent >= level.threshold_amount:
+            return level
+
+    return None
+
+
 def _get_order_items_snapshot(db: Session, order_id: int) -> List[OrderItemSnapshot]:
     """获取订单项快照列表"""
     order_items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
@@ -49,9 +71,11 @@ def _get_order_items_snapshot(db: Session, order_id: int) -> List[OrderItemSnaps
             book_title=item.book_title,
             book_author=item.book_author,
             book_price=item.book_price,
+            book_member_price=item.book_member_price,
             book_cover=item.book_cover,
             quantity=item.quantity,
-            subtotal=item.subtotal
+            subtotal=item.subtotal,
+            member_subtotal=item.member_subtotal
         )
         for item in order_items
     ]
@@ -83,6 +107,7 @@ def _get_order_response(db: Session, order: Order) -> OrderResponse:
         total_amount=order.total_amount,
         original_amount=order.original_amount,
         discount_amount=order.discount_amount,
+        member_discount_amount=order.member_discount_amount,
         user_coupon_id=order.user_coupon_id,
         status=order.status,
         receiver_name=order.receiver_name,
@@ -96,6 +121,9 @@ def _get_order_response(db: Session, order: Order) -> OrderResponse:
         paid_at=order.paid_at,
         shipped_at=order.shipped_at,
         delivered_at=order.delivered_at,
+        member_level_id=order.member_level_id,
+        member_level_name=order.member_level_name,
+        member_discount_rate=order.member_discount_rate,
         created_at=order.created_at,
         updated_at=order.updated_at,
         items=items,
@@ -193,6 +221,19 @@ def _validate_and_calculate_coupon(
     return user_coupon, discount_amount
 
 
+def _update_user_total_spent(db: Session, user_id: int):
+    """更新用户累计有效消费金额"""
+    valid_orders = db.query(Order).filter(
+        Order.user_id == user_id,
+        Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED])
+    ).all()
+    total = sum(order.total_amount for order in valid_orders)
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.total_spent = round(total, 2)
+        db.commit()
+
+
 # ========== 用户端API ==========
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -200,7 +241,7 @@ def create_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """创建订单（从购物车勾选商品，支持优惠券抵扣）"""
+    """创建订单（从购物车勾选商品，支持会员折扣和优惠券抵扣）"""
     try:
         if order_create.cart_item_ids:
             cart_items = db.query(CartItem).filter(
@@ -233,20 +274,32 @@ def create_order(
                     detail=f"图书《{book.title}》库存不足，当前库存 {book.stock} 本"
                 )
 
+        member_level = _get_user_member_level(db, current_user)
+        member_discount_rate = member_level.discount_rate if member_level else 1.0
+        member_level_id = member_level.id if member_level else None
+        member_level_name = member_level.name if member_level else None
+
         original_amount = 0.0
+        member_amount = 0.0
         for cart_item in cart_items:
             book = db.query(Book).filter(Book.id == cart_item.book_id).first()
             original_amount += book.price * cart_item.quantity
+            member_amount += round(book.price * member_discount_rate, 2) * cart_item.quantity
         original_amount = round(original_amount, 2)
+        member_amount = round(member_amount, 2)
+        member_discount_amount = round(original_amount - member_amount, 2)
+        if member_discount_amount < 0:
+            member_discount_amount = 0.0
 
-        discount_amount = 0.0
+        coupon_discount_amount = 0.0
         user_coupon = None
         if order_create.user_coupon_id:
-            user_coupon, discount_amount = _validate_and_calculate_coupon(
-                db, order_create.user_coupon_id, current_user, cart_items, original_amount
+            user_coupon, coupon_discount_amount = _validate_and_calculate_coupon(
+                db, order_create.user_coupon_id, current_user, cart_items, member_amount
             )
 
-        total_amount = round(original_amount - discount_amount, 2)
+        total_discount = round(member_discount_amount + coupon_discount_amount, 2)
+        total_amount = round(original_amount - total_discount, 2)
         if total_amount < 0:
             total_amount = 0.0
 
@@ -257,13 +310,17 @@ def create_order(
             user_id=current_user.id,
             total_amount=total_amount,
             original_amount=original_amount,
-            discount_amount=discount_amount,
+            discount_amount=total_discount,
+            member_discount_amount=member_discount_amount,
             user_coupon_id=order_create.user_coupon_id,
             status=OrderStatus.PENDING,
             receiver_name=order_create.receiver_name,
             receiver_phone=order_create.receiver_phone,
             receiver_address=order_create.receiver_address,
-            remark=order_create.remark
+            remark=order_create.remark,
+            member_level_id=member_level_id,
+            member_level_name=member_level_name,
+            member_discount_rate=member_discount_rate
         )
         db.add(db_order)
         db.flush()
@@ -272,7 +329,9 @@ def create_order(
             book = db.query(Book).filter(Book.id == cart_item.book_id).first()
             book.stock -= cart_item.quantity
 
+            book_member_price = round(book.price * member_discount_rate, 2)
             subtotal = round(book.price * cart_item.quantity, 2)
+            member_subtotal = round(book_member_price * cart_item.quantity, 2)
 
             db_order_item = OrderItem(
                 order_id=db_order.id,
@@ -280,9 +339,11 @@ def create_order(
                 book_title=book.title,
                 book_author=book.author,
                 book_price=book.price,
+                book_member_price=book_member_price,
                 book_cover=book.cover_image,
                 quantity=cart_item.quantity,
-                subtotal=subtotal
+                subtotal=subtotal,
+                member_subtotal=member_subtotal
             )
             db.add(db_order_item)
 
@@ -296,10 +357,13 @@ def create_order(
         db.commit()
         db.refresh(db_order)
 
-        if discount_amount > 0:
-            logger.info(f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 原价 {original_amount:.2f}, 优惠 {discount_amount:.2f}, 实付 {total_amount:.2f}")
-        else:
-            logger.info(f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 金额 {total_amount:.2f}")
+        log_msg = f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 原价 {original_amount:.2f}"
+        if member_discount_amount > 0:
+            log_msg += f", 会员优惠 {member_discount_amount:.2f}"
+        if coupon_discount_amount > 0:
+            log_msg += f", 优惠券优惠 {coupon_discount_amount:.2f}"
+        log_msg += f", 实付 {total_amount:.2f}"
+        logger.info(log_msg)
         return _get_order_response(db, db_order)
 
     except HTTPException:
@@ -545,6 +609,11 @@ def update_order_admin(
     db.refresh(order)
 
     if status_changed:
+        valid_statuses = [OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED]
+        if old_status not in valid_statuses or order.status not in valid_statuses:
+            _update_user_total_spent(db, order.user_id)
+            db.refresh(order)
+
         send_order_status_message(
             db=db,
             order=order,

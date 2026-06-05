@@ -79,12 +79,27 @@
                 </h3>
                 <p class="item-author">{{ item.book.author }}</p>
                 <p class="item-price">
-                  单价：<span class="price">¥{{ item.book.price.toFixed(2) }}</span>
+                  单价：
+                  <template v-if="memberLevelInfo?.current_level && memberLevelInfo.current_level.discount_rate < 1">
+                    <span class="original-price">¥{{ item.book.price.toFixed(2) }}</span>
+                    <span class="member-price-tag">
+                      会员价 ¥{{ (item.book.price * memberLevelInfo.current_level.discount_rate).toFixed(2) }}
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="price">¥{{ item.book.price.toFixed(2) }}</span>
+                  </template>
                   <span class="quantity">x {{ item.quantity }}</span>
                 </p>
               </div>
               <div class="item-subtotal">
-                <span class="subtotal">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
+                <template v-if="memberLevelInfo?.current_level && memberLevelInfo.current_level.discount_rate < 1">
+                  <span class="subtotal">¥{{ (item.quantity * item.book.price * memberLevelInfo.current_level.discount_rate).toFixed(2) }}</span>
+                  <span class="original-subtotal">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
+                </template>
+                <template v-else>
+                  <span class="subtotal">¥{{ (item.quantity * item.book.price).toFixed(2) }}</span>
+                </template>
               </div>
             </div>
           </div>
@@ -108,8 +123,23 @@
             <span>{{ cartStore.selectedCount }} 件</span>
           </div>
           <div class="summary-row">
-            <span>商品总价：</span>
-            <span>¥{{ cartStore.selectedPrice.toFixed(2) }}</span>
+            <span>商品原价：</span>
+            <span>¥{{ originalPrice.toFixed(2) }}</span>
+          </div>
+          <div v-if="memberLevelInfo?.current_level" class="summary-row member-level-row">
+            <span>会员等级：</span>
+            <el-tag
+              :color="memberLevelInfo.current_level.badge_color || '#409eff'"
+              effect="dark"
+              size="small"
+            >
+              {{ memberLevelInfo.current_level.name }}
+              {{ (memberLevelInfo.current_level.discount_rate * 10).toFixed(1) }}折
+            </el-tag>
+          </div>
+          <div v-if="memberDiscount > 0" class="summary-row member-discount-row">
+            <span>会员优惠：</span>
+            <span class="member-discount">-¥{{ memberDiscount.toFixed(2) }}</span>
           </div>
           <div class="summary-row">
             <span>运费：</span>
@@ -149,8 +179,11 @@
               <span>应付金额：</span>
               <span class="footer-price">¥{{ finalPrice.toFixed(2) }}</span>
             </div>
-            <div v-if="selectedCoupon" class="discount-info">
-              已优惠 ¥{{ discountAmount.toFixed(2) }}
+            <div v-if="totalDiscount > 0" class="discount-info">
+              已优惠 ¥{{ totalDiscount.toFixed(2) }}
+              <span v-if="memberDiscount > 0">（会员优惠 ¥{{ memberDiscount.toFixed(2) }}</span>
+              <span v-if="discountAmount > 0">{{ memberDiscount > 0 ? '，' : '（' }}券优惠 ¥{{ discountAmount.toFixed(2) }}</span>
+              <span v-if="totalDiscount > 0">）</span>
             </div>
             <el-button
               type="primary"
@@ -249,7 +282,7 @@ import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { api } from '@/api'
-import type { UserCoupon, OrderCreateWithCoupon } from '@/types'
+import type { UserCoupon, OrderCreateWithCoupon, UserMemberLevelInfo } from '@/types'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 
 const router = useRouter()
@@ -260,6 +293,7 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const submitting = ref(false)
 const defaultCover = 'https://via.placeholder.com/120x160/6366f1/ffffff?text=Book'
+const memberLevelInfo = ref<UserMemberLevelInfo | null>(null)
 
 const couponDialogVisible = ref(false)
 const couponsLoading = ref(false)
@@ -268,12 +302,29 @@ const unavailableCoupons = ref<UserCoupon[]>([])
 const selectedCoupon = ref<UserCoupon | null>(null)
 const tempSelectedCoupon = ref<UserCoupon | null>(null)
 
+const originalPrice = computed(() => {
+  return cartStore.selectedPrice
+})
+
+const memberDiscount = computed(() => {
+  if (!memberLevelInfo.value?.current_level || memberLevelInfo.value.current_level.discount_rate >= 1) {
+    return 0
+  }
+  const discountRate = memberLevelInfo.value.current_level.discount_rate
+  return cartStore.selectedPrice * (1 - discountRate)
+})
+
 const discountAmount = computed(() => {
   return selectedCoupon.value ? selectedCoupon.value.coupon.discount_amount : 0
 })
 
+const totalDiscount = computed(() => {
+  return memberDiscount.value + discountAmount.value
+})
+
 const finalPrice = computed(() => {
-  const price = cartStore.selectedPrice - discountAmount.value
+  const priceAfterMember = cartStore.selectedPrice - memberDiscount.value
+  const price = priceAfterMember - discountAmount.value
   return price > 0 ? price : 0
 })
 
@@ -315,13 +366,25 @@ async function checkLoginAndFetch() {
   }
   loading.value = true
   try {
-    await cartStore.fetchCart()
+    await Promise.all([
+      cartStore.fetchCart(),
+      fetchMemberLevel()
+    ])
     if (selectedItems.value.length === 0) {
       ElMessage.warning('请先选择要结算的商品')
       router.push('/cart')
     }
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchMemberLevel() {
+  try {
+    memberLevelInfo.value = await api.getMyMemberLevel()
+  } catch (error) {
+    console.error('获取会员等级信息失败:', error)
+    memberLevelInfo.value = null
   }
 }
 
@@ -388,9 +451,18 @@ async function handleSubmit() {
     return
   }
 
-  const confirmMessage = selectedCoupon.value
-    ? `确认提交订单吗？\n商品金额：¥${cartStore.selectedPrice.toFixed(2)}\n优惠金额：¥${discountAmount.value.toFixed(2)}\n应付金额：¥${finalPrice.value.toFixed(2)}`
-    : `确认提交订单吗？应付金额 ¥${cartStore.selectedPrice.toFixed(2)}`
+  let confirmMessage = '确认提交订单吗？\n'
+  confirmMessage += `商品原价：¥${originalPrice.value.toFixed(2)}\n`
+  if (memberDiscount.value > 0) {
+    confirmMessage += `会员优惠：-¥${memberDiscount.value.toFixed(2)}\n`
+  }
+  if (discountAmount.value > 0) {
+    confirmMessage += `优惠券优惠：-¥${discountAmount.value.toFixed(2)}\n`
+  }
+  if (totalDiscount.value > 0) {
+    confirmMessage += `已优惠：¥${totalDiscount.value.toFixed(2)}\n`
+  }
+  confirmMessage += `应付金额：¥${finalPrice.value.toFixed(2)}`
 
   try {
     await ElMessageBox.confirm(confirmMessage, '提交订单', {
@@ -808,5 +880,44 @@ async function handleSubmit() {
   .order-summary {
     position: static;
   }
+}
+
+.original-price {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  margin-right: 8px;
+}
+
+.member-price-tag {
+  font-weight: 600;
+  color: var(--warning-color);
+}
+
+.item-subtotal {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.original-subtotal {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.member-level-row {
+  display: flex;
+  align-items: center;
+}
+
+.member-discount-row {
+  color: var(--warning-color);
+}
+
+.member-discount {
+  font-weight: 600;
+  color: var(--danger-color);
 }
 </style>

@@ -641,6 +641,102 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane label="会员等级管理" name="member-levels">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>会员等级管理</h1>
+            <el-button type="primary" @click="handleAddMemberLevel">
+              <el-icon><Plus /></el-icon>
+              添加等级
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-select
+              v-model="memberLevelStatusFilter"
+              placeholder="启用状态"
+              clearable
+              style="width: 150px"
+              @change="fetchMemberLevels"
+            >
+              <el-option label="已启用" :value="true" />
+              <el-option label="已停用" :value="false" />
+            </el-select>
+            <el-button @click="fetchMemberLevels">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="memberLevels"
+            v-loading="memberLevelsLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column label="等级标识" width="100">
+              <template #default="{ row }">
+                <el-tag
+                  :style="{ backgroundColor: row.badge_color || '#409eff', borderColor: row.badge_color || '#409eff' }"
+                  size="small"
+                  effect="dark"
+                >
+                  {{ row.name }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="等级名称" width="120" />
+            <el-table-column label="升级门槛(消费金额)" width="160">
+              <template #default="{ row }">
+                ¥{{ row.threshold_amount.toFixed(2) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="折扣比例" width="100">
+              <template #default="{ row }">
+                <span class="discount-text">{{ (row.discount_rate * 10).toFixed(1) }}折</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="等级标识颜色" width="120">
+              <template #default="{ row }">
+                <span class="color-preview" :style="{ backgroundColor: row.badge_color || '#409eff' }"></span>
+                <span class="color-hex">{{ row.badge_color || '默认' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="sort_order" label="排序权重" width="100" />
+            <el-table-column label="启用状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '已启用' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEditMemberLevel(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  :title="`确定要删除等级「${row.name}」吗？`"
+                  @confirm="handleDeleteMemberLevel(row.id)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="memberLevelsCurrentPage"
+              v-model:page-size="memberLevelsPageSize"
+              :total="memberLevelsTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchMemberLevels"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane label="消息管理" name="messages">
         <div class="tab-content">
           <div class="admin-header">
@@ -1568,6 +1664,104 @@
     </el-dialog>
 
     <el-dialog
+      v-model="memberLevelDialogVisible"
+      :title="isMemberLevelEdit ? '编辑会员等级' : '添加会员等级'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="memberLevelFormRef"
+        :model="memberLevelForm"
+        :rules="memberLevelRules"
+        label-width="100px"
+      >
+        <el-form-item label="等级名称" prop="name">
+          <el-input v-model="memberLevelForm.name" placeholder="请输入等级名称" maxlength="50" show-word-limit />
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="升级门槛" prop="threshold_amount">
+              <el-input-number
+                v-model="memberLevelForm.threshold_amount"
+                :min="0"
+                :precision="2"
+                :step="100"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">累计消费达到此金额自动升级</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="折扣比例" prop="discount_rate">
+              <el-input-number
+                v-model="memberLevelForm.discount_rate"
+                :min="0.1"
+                :max="1"
+                :step="0.01"
+                :precision="2"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">0.95表示95折，1表示不打折</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="权益描述" prop="benefits">
+          <el-input
+            v-model="memberLevelForm.benefits"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入该等级的权益说明（可选）"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="标识颜色" prop="badge_color">
+              <el-color-picker v-model="memberLevelForm.badge_color" show-alpha />
+              <span class="form-tip">等级标签的显示颜色</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="排序权重" prop="sort_order">
+              <el-input-number
+                v-model="memberLevelForm.sort_order"
+                :min="0"
+                :max="999"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">数值越小排序越靠前</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="图标URL" prop="icon">
+          <el-input v-model="memberLevelForm.icon" placeholder="请输入等级图标图片URL（可选）" />
+        </el-form-item>
+
+        <el-form-item label="启用状态" prop="is_active">
+          <el-radio-group v-model="memberLevelForm.is_active">
+            <el-radio :value="true">启用</el-radio>
+            <el-radio :value="false">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="memberLevelDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="memberLevelSubmitting" @click="handleMemberLevelSubmit">
+          {{ isMemberLevelEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="announcementDialogVisible"
       title="发布公告"
       width="600px"
@@ -1677,7 +1871,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook, MemberLevel, MemberLevelCreate, MemberLevelUpdate } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, User, Top, Bottom } from '@element-plus/icons-vue'
 import Dashboard from '@/components/Dashboard.vue'
@@ -1885,6 +2079,37 @@ const currentBookListDetail = ref<BookListDetail | null>(null)
 const selectedBookIds = ref<number[]>([])
 const bookSearchLoading = ref(false)
 const bookSearchOptions = ref<Book[]>([])
+
+const memberLevelsLoading = ref(false)
+const memberLevels = ref<MemberLevel[]>([])
+const memberLevelsTotal = ref(0)
+const memberLevelsCurrentPage = ref(1)
+const memberLevelsPageSize = ref(10)
+const memberLevelStatusFilter = ref<boolean | ''>('')
+const memberLevelDialogVisible = ref(false)
+const isMemberLevelEdit = ref(false)
+const memberLevelEditingId = ref<number | null>(null)
+const memberLevelSubmitting = ref(false)
+const memberLevelFormRef = ref<FormInstance>()
+
+const memberLevelForm = reactive<MemberLevelCreate>({
+  name: '',
+  threshold_amount: 0,
+  discount_rate: 1,
+  benefits: '',
+  badge_color: '#409eff',
+  icon: '',
+  sort_order: 0,
+  is_active: true
+})
+
+const memberLevelRules: FormRules = {
+  name: [{ required: true, message: '请输入等级名称', trigger: 'blur' }],
+  threshold_amount: [{ required: true, message: '请输入升级门槛金额', trigger: 'blur' }],
+  discount_rate: [{ required: true, message: '请输入折扣比例', trigger: 'blur' }],
+  sort_order: [{ required: true, message: '请输入排序权重', trigger: 'blur' }]
+}
+
 const adminUsers = ref<User[]>([])
 const adminUsersLoading = ref(false)
 const selectedUserIds = ref<number[]>([])
@@ -1937,6 +2162,12 @@ onMounted(() => {
   if (activeTab.value === 'publishers') {
     fetchPublishers()
   }
+  if (activeTab.value === 'book-lists') {
+    fetchBookLists()
+  }
+  if (activeTab.value === 'member-levels') {
+    fetchMemberLevels()
+  }
   if (activeTab.value === 'messages') {
     fetchAdminMessages()
     fetchMessageStats()
@@ -1967,6 +2198,12 @@ watch(activeTab, (newTab) => {
   }
   if (newTab === 'publishers' && publishers.value.length === 0) {
     fetchPublishers()
+  }
+  if (newTab === 'book-lists' && bookLists.value.length === 0) {
+    fetchBookLists()
+  }
+  if (newTab === 'member-levels' && memberLevels.value.length === 0) {
+    fetchMemberLevels()
   }
   if (newTab === 'messages') {
     fetchAdminMessages()
@@ -2920,6 +3157,95 @@ function handleBookOptionCoverError(e: Event) {
   img.src = defaultCover
 }
 
+async function fetchMemberLevels() {
+  memberLevelsLoading.value = true
+  try {
+    const response = await api.getAdminMemberLevels({
+      is_active: memberLevelStatusFilter.value === '' ? undefined : memberLevelStatusFilter.value,
+      page: memberLevelsCurrentPage.value,
+      page_size: memberLevelsPageSize.value
+    })
+    memberLevels.value = response.items
+    memberLevelsTotal.value = response.total
+  } catch (error) {
+    console.error('获取会员等级列表失败:', error)
+  } finally {
+    memberLevelsLoading.value = false
+  }
+}
+
+function handleAddMemberLevel() {
+  isMemberLevelEdit.value = false
+  memberLevelEditingId.value = null
+  resetMemberLevelForm()
+  memberLevelDialogVisible.value = true
+}
+
+function handleEditMemberLevel(level: MemberLevel) {
+  isMemberLevelEdit.value = true
+  memberLevelEditingId.value = level.id
+  Object.assign(memberLevelForm, {
+    name: level.name,
+    threshold_amount: level.threshold_amount,
+    discount_rate: level.discount_rate,
+    benefits: level.benefits || '',
+    badge_color: level.badge_color || '#409eff',
+    icon: level.icon || '',
+    sort_order: level.sort_order,
+    is_active: level.is_active
+  })
+  memberLevelDialogVisible.value = true
+}
+
+async function handleDeleteMemberLevel(id: number) {
+  try {
+    await api.deleteMemberLevel(id)
+    ElMessage.success('删除成功')
+    fetchMemberLevels()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function handleMemberLevelSubmit() {
+  if (!memberLevelFormRef.value) return
+  
+  await memberLevelFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    memberLevelSubmitting.value = true
+    try {
+      if (isMemberLevelEdit.value && memberLevelEditingId.value) {
+        const updateData: MemberLevelUpdate = { ...memberLevelForm }
+        await api.updateMemberLevel(memberLevelEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createMemberLevel(memberLevelForm)
+        ElMessage.success('添加成功')
+      }
+      memberLevelDialogVisible.value = false
+      fetchMemberLevels()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      memberLevelSubmitting.value = false
+    }
+  })
+}
+
+function resetMemberLevelForm() {
+  Object.assign(memberLevelForm, {
+    name: '',
+    threshold_amount: 0,
+    discount_rate: 1,
+    benefits: '',
+    badge_color: '#409eff',
+    icon: '',
+    sort_order: 0,
+    is_active: true
+  })
+}
+
 onMounted(() => {
   fetchBooks()
   fetchOrders()
@@ -2929,6 +3255,7 @@ onMounted(() => {
   fetchAdminMessages()
   fetchMessageStats()
   fetchBookLists()
+  fetchMemberLevels()
 })
 </script>
 
@@ -3356,5 +3683,26 @@ onMounted(() => {
 .book-item-author {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.discount-text {
+  font-weight: 600;
+  color: var(--danger-color);
+}
+
+.color-preview {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.color-hex {
+  font-size: 12px;
+  color: var(--text-secondary);
+  vertical-align: middle;
 }
 </style>

@@ -57,7 +57,25 @@
           
           <div class="book-price-section">
             <span class="price-label">价格</span>
-            <span class="price-value">¥{{ book.price.toFixed(2) }}</span>
+            <div class="price-info">
+              <span class="price-value">¥{{ book.price.toFixed(2)}}</span>
+              <div v-if="memberPriceInfo && userStore.isLoggedIn" class="member-price-box">
+                <div class="member-price-row">
+                  <span class="member-label">会员价</span>
+                  <span class="member-price">¥{{ memberPriceInfo.price_info.member_price.toFixed(2) }}</span>
+                </div>
+                <el-tag
+                  v-if="memberPriceInfo.price_info.level_name"
+                  size="small"
+                  type="warning"
+                  effect="light"
+                  class="level-tag"
+                >
+                  {{ memberPriceInfo.price_info.level_name }}
+                  {{ (memberPriceInfo.price_info.discount_rate * 10).toFixed(1) }}折
+                </el-tag>
+              </div>
+            </div>
           </div>
           
           <div class="book-stock-section">
@@ -116,7 +134,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book } from '@/types'
+import type { Book, BookMemberPriceResponse } from '@/types'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -129,6 +147,7 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const book = ref<Book | null>(null)
+const memberPriceInfo = ref<BookMemberPriceResponse | null>(null)
 const quantity = ref(1)
 const defaultCover = 'https://via.placeholder.com/300x400/6366f1/ffffff?text=Book'
 
@@ -139,14 +158,7 @@ onMounted(async () => {
     return
   }
   
-  loading.value = true
-  try {
-    book.value = await api.getBook(bookId)
-  } catch (error) {
-    console.error('获取图书详情失败:', error)
-  } finally {
-    loading.value = false
-  }
+  await fetchBookData(bookId)
 })
 
 watch(
@@ -155,17 +167,32 @@ watch(
     const bookId = Number(route.params.id)
     if (bookId) {
       quantity.value = 1
-      loading.value = true
-      try {
-        book.value = await api.getBook(bookId)
-      } catch (error) {
-        console.error('获取图书详情失败:', error)
-      } finally {
-        loading.value = false
-      }
+      await fetchBookData(bookId)
     }
   }
 )
+
+async function fetchBookData(bookId: number) {
+  loading.value = true
+  try {
+    const bookData = await api.getBook(bookId)
+    book.value = bookData
+    
+    if (userStore.isLoggedIn) {
+      try {
+        memberPriceInfo.value = await api.getBookMemberPrice(bookId)
+      } catch (e) {
+        memberPriceInfo.value = null
+      }
+    } else {
+      memberPriceInfo.value = null
+    }
+  } catch (error) {
+    console.error('获取图书详情失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
 
 function handleImageError(e: Event) {
   const img = e.target as HTMLImageElement
@@ -333,6 +360,43 @@ function handleBuyNow() {
   font-size: 32px;
   font-weight: 700;
   color: var(--secondary-color);
+}
+
+.price-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-price-box {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.member-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.member-label {
+  font-size: 13px;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.member-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.level-tag {
+  margin-left: auto;
 }
 
 .stock-value {

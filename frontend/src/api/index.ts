@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest, MemberLevel, MemberLevelListResponse, MemberLevelCreate, MemberLevelUpdate, UserMemberLevelInfo, UserMemberLevelUpdate, BookMemberPriceResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -259,5 +259,38 @@ export const api = {
         instance.delete(`/book-lists/${listId}/books/${bookId}`),
 
     reorderBooksInBookList: (id: number, data: BookListReorderRequest): Promise<BookListDetail> =>
-        instance.put(`/book-lists/${id}/books/reorder`, data)
+        instance.put(`/book-lists/${id}/books/reorder`, data),
+
+    getAdminMemberLevels: (params?: { is_active?: boolean; page?: number; page_size?: number }): Promise<MemberLevelListResponse> =>
+        instance.get('/member-levels/admin', { params }),
+
+    getAdminAllActiveMemberLevels: (): Promise<MemberLevel[]> =>
+        instance.get('/member-levels/admin/all'),
+
+    getAdminMemberLevel: (levelId: number): Promise<MemberLevel> =>
+        instance.get(`/member-levels/admin/${levelId}`),
+
+    createMemberLevel: (data: MemberLevelCreate): Promise<MemberLevel> =>
+        instance.post('/member-levels', data),
+
+    updateMemberLevel: (levelId: number, data: MemberLevelUpdate): Promise<MemberLevel> =>
+        instance.put(`/member-levels/${levelId}`, data),
+
+    deleteMemberLevel: (levelId: number): Promise<void> =>
+        instance.delete(`/member-levels/${levelId}`),
+
+    updateUserMemberLevel: (userId: number, data: UserMemberLevelUpdate): Promise<UserMemberLevelInfo> =>
+        instance.patch(`/member-levels/users/${userId}/level`, data),
+
+    recalculateUserSpent: (userId: number): Promise<UserMemberLevelInfo> =>
+        instance.post(`/member-levels/users/${userId}/recalculate`),
+
+    getActiveMemberLevels: (): Promise<MemberLevel[]> =>
+        instance.get('/member-levels/active'),
+
+    getMyMemberLevel: (): Promise<UserMemberLevelInfo> =>
+        instance.get('/member-levels/my'),
+
+    getBookMemberPrice: (bookId: number): Promise<BookMemberPriceResponse> =>
+        instance.get(`/member-levels/my/price/${bookId}`)
 }

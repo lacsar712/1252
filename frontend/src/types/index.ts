@@ -4,6 +4,8 @@ export interface User {
     email: string
     is_active: boolean
     is_admin: boolean
+    total_spent: number
+    manual_level_id: number | null
     created_at: string
 }
 
@@ -234,9 +236,11 @@ export interface OrderItemSnapshot {
     book_title: string
     book_author: string
     book_price: number
+    book_member_price: number
     book_cover: string | null
     quantity: number
     subtotal: number
+    member_subtotal: number
 }
 
 export interface Order {
@@ -246,6 +250,7 @@ export interface Order {
     total_amount: number
     original_amount: number
     discount_amount: number
+    member_discount_amount: number
     user_coupon_id: number | null
     status: OrderStatus
     receiver_name: string
@@ -259,6 +264,9 @@ export interface Order {
     paid_at: string | null
     shipped_at: string | null
     delivered_at: string | null
+    member_level_id: number | null
+    member_level_name: string | null
+    member_discount_rate: number | null
     created_at: string
     updated_at: string
     items: OrderItemSnapshot[]
@@ -563,4 +571,73 @@ export interface BookListUpdateBookRequest {
 
 export interface BookListReorderRequest {
     book_ids: number[]
+}
+
+export interface MemberLevel {
+    id: number
+    name: string
+    threshold_amount: number
+    discount_rate: number
+    benefits: string | null
+    badge_color: string | null
+    icon: string | null
+    sort_order: number
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface MemberLevelListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: MemberLevel[]
+}
+
+export interface MemberLevelCreate {
+    name: string
+    threshold_amount: number
+    discount_rate: number
+    benefits?: string
+    badge_color?: string
+    icon?: string
+    sort_order: number
+    is_active: boolean
+}
+
+export interface MemberLevelUpdate {
+    name?: string
+    threshold_amount?: number
+    discount_rate?: number
+    benefits?: string
+    badge_color?: string
+    icon?: string
+    sort_order?: number
+    is_active?: boolean
+}
+
+export interface UserMemberLevelInfo {
+    user_id: number
+    total_spent: number
+    current_level: MemberLevel | null
+    next_level: MemberLevel | null
+    amount_to_next: number
+    manual_level: MemberLevel | null
+    is_manual: boolean
+}
+
+export interface UserMemberLevelUpdate {
+    manual_level_id?: number | null
+}
+
+export interface MemberPriceInfo {
+    original_price: number
+    member_price: number
+    discount_rate: number
+    level_name: string | null
+}
+
+export interface BookMemberPriceResponse {
+    book_id: number
+    price_info: MemberPriceInfo
 }

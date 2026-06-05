@@ -95,6 +95,12 @@ const routes: RouteRecordRaw[] = [
                 name: 'Messages',
                 component: () => import('@/views/Messages.vue'),
                 meta: { title: '消息中心', requiresAuth: true }
+            },
+            {
+                path: 'member',
+                name: 'Member',
+                component: () => import('@/views/Member.vue'),
+                meta: { title: '会员中心', requiresAuth: true }
             }
         ]
     },

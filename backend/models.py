@@ -54,6 +54,23 @@ class Author(Base):
     books = relationship("Book", secondary=book_author, back_populates="authors")
 
 
+class MemberLevel(Base):
+    """会员等级模型"""
+    __tablename__ = "member_levels"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(50), nullable=False, unique=True, index=True)
+    threshold_amount = Column(Float, nullable=False, default=0.0)
+    discount_rate = Column(Float, nullable=False, default=1.0)
+    benefits = Column(Text, nullable=True)
+    badge_color = Column(String(20), nullable=True)
+    icon = Column(String(500), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class User(Base):
     """用户模型"""
     __tablename__ = "users"
@@ -64,8 +81,12 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    total_spent = Column(Float, nullable=False, default=0.0)
+    manual_level_id = Column(Integer, ForeignKey("member_levels.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    manual_level = relationship("MemberLevel", foreign_keys=[manual_level_id])
 
 
 class Book(Base):
@@ -123,6 +144,7 @@ class Order(Base):
     total_amount = Column(Float, nullable=False)
     original_amount = Column(Float, nullable=False, default=0.0)
     discount_amount = Column(Float, nullable=False, default=0.0)
+    member_discount_amount = Column(Float, nullable=False, default=0.0)
     user_coupon_id = Column(Integer, nullable=True, index=True)
     status = Column(String(20), default=OrderStatus.PENDING, nullable=False)
     receiver_name = Column(String(50), nullable=False)
@@ -136,6 +158,9 @@ class Order(Base):
     paid_at = Column(DateTime, nullable=True)
     shipped_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
+    member_level_id = Column(Integer, nullable=True, index=True)
+    member_level_name = Column(String(50), nullable=True)
+    member_discount_rate = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -152,9 +177,11 @@ class OrderItem(Base):
     book_title = Column(String(200), nullable=False)
     book_author = Column(String(100), nullable=False)
     book_price = Column(Float, nullable=False)
+    book_member_price = Column(Float, nullable=False, default=0.0)
     book_cover = Column(String(500), nullable=True)
     quantity = Column(Integer, nullable=False)
     subtotal = Column(Float, nullable=False)
+    member_subtotal = Column(Float, nullable=False, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order = relationship("Order", back_populates="items")
