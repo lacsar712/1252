@@ -442,3 +442,57 @@ export interface MessageStatsResponse {
     read_recipients: number
     read_rate: number
 }
+
+export interface DashboardStats {
+    total_books: number
+    total_users: number
+    total_orders: number
+    low_stock_count: number
+    total_inventory_value: number
+    pending_orders: number
+    today_orders: number
+    today_revenue: number
+}
+
+export interface RecentBook {
+    id: number
+    title: string
+    cover_image: string | null
+    price: number
+    stock: number
+    category: string | null
+    created_at: string
+}
+
+export interface RecentOrder {
+    id: number
+    order_no: string
+    receiver_name: string
+    total_amount: number
+    status: OrderStatus
+    created_at: string
+}
+
+export interface CategoryStock {
+    category: string
+    count: number
+    value: number
+    percentage: number
+}
+
+export interface SalesTrendItem {
+    date: string
+    order_count: number
+    revenue: number
+    book_count: number
+}
+
+export interface DashboardResponse {
+    stats: DashboardStats
+    recent_books: RecentBook[]
+    recent_orders: RecentOrder[]
+    category_stock: CategoryStock[]
+    sales_trend: SalesTrendItem[]
+}
+
+export type TimeRange = 7 | 30 | 90

@@ -497,3 +497,56 @@ class MessageMarkReadRequest(BaseModel):
 
 class MessageBatchDeleteRequest(BaseModel):
     message_ids: List[int] = Field(..., description="消息ID列表")
+
+
+# ========== 仪表盘相关 Schema ==========
+class DashboardStats(BaseModel):
+    total_books: int = Field(0, description="图书总数")
+    total_users: int = Field(0, description="用户总数")
+    total_orders: int = Field(0, description="订单总数")
+    low_stock_count: int = Field(0, description="低库存数量")
+    total_inventory_value: float = Field(0.0, description="库存总价值")
+    pending_orders: int = Field(0, description="待处理订单")
+    today_orders: int = Field(0, description="今日订单")
+    today_revenue: float = Field(0.0, description="今日销售额")
+
+
+class RecentBook(BaseModel):
+    id: int
+    title: str
+    cover_image: Optional[str]
+    price: float
+    stock: int
+    category: Optional[str]
+    created_at: datetime
+
+
+class RecentOrder(BaseModel):
+    id: int
+    order_no: str
+    receiver_name: str
+    total_amount: float
+    status: str
+    created_at: datetime
+
+
+class CategoryStock(BaseModel):
+    category: str
+    count: int
+    value: float
+    percentage: float
+
+
+class SalesTrendItem(BaseModel):
+    date: str
+    order_count: int
+    revenue: float
+    book_count: int
+
+
+class DashboardResponse(BaseModel):
+    stats: DashboardStats
+    recent_books: List[RecentBook]
+    recent_orders: List[RecentOrder]
+    category_stock: List[CategoryStock]
+    sales_trend: List[SalesTrendItem]

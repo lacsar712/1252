@@ -1,6 +1,9 @@
 <template>
   <div class="admin-page">
     <el-tabs v-model="activeTab" class="admin-tabs">
+      <el-tab-pane label="数据仪表盘" name="dashboard">
+        <Dashboard />
+      </el-tab-pane>
       <el-tab-pane label="图书管理" name="books">
         <div class="tab-content">
           <div class="admin-header">
@@ -1369,12 +1372,16 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '@/api'
 import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, User } from '@element-plus/icons-vue'
+import Dashboard from '@/components/Dashboard.vue'
 
-const activeTab = ref('books')
+const route = useRoute()
+const initialTab = (route.query.tab as string) || 'dashboard'
+const activeTab = ref(initialTab)
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -1577,10 +1584,40 @@ const bookRules: FormRules = {
 }
 
 onMounted(() => {
-  fetchBooks()
+  if (activeTab.value === 'books') {
+    fetchBooks()
+  }
+  if (activeTab.value === 'orders') {
+    fetchOrders()
+  }
+  if (activeTab.value === 'coupons') {
+    fetchCoupons()
+  }
+  if (activeTab.value === 'authors') {
+    fetchAuthors()
+  }
+  if (activeTab.value === 'publishers') {
+    fetchPublishers()
+  }
+  if (activeTab.value === 'messages') {
+    fetchAdminMessages()
+    fetchMessageStats()
+  }
 })
 
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+      activeTab.value = newTab
+    }
+  }
+)
+
 watch(activeTab, (newTab) => {
+  if (newTab === 'books' && books.value.length === 0) {
+    fetchBooks()
+  }
   if (newTab === 'orders' && orders.value.length === 0) {
     fetchOrders()
   }
