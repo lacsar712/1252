@@ -18,6 +18,7 @@ from routes.books import router as books_router
 from routes.cart import router as cart_router
 from routes.orders import router as orders_router
 from routes.coupons import router as coupons_router
+from routes.authors import router as authors_router
 
 # 配置日志
 logging.basicConfig(
@@ -75,6 +76,7 @@ app.include_router(books_router)
 app.include_router(cart_router)
 app.include_router(orders_router)
 app.include_router(coupons_router)
+app.include_router(authors_router)
 
 # 挂载静态文件
 # 确保static目录存在

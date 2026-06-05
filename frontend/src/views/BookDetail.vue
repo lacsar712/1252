@@ -23,7 +23,21 @@
           <div class="book-meta">
             <div class="meta-item">
               <el-icon><User /></el-icon>
-              <span>作者：{{ book.author }}</span>
+              <span>作者：</span>
+              <template v-if="book.authors && book.authors.length > 0">
+                <span class="authors-list">
+                  <router-link
+                    v-for="(author, index) in book.authors"
+                    :key="author.id"
+                    :to="`/authors/${author.id}`"
+                    class="author-link"
+                  >
+                    {{ author.name }}
+                    <span v-if="index < book.authors.length - 1">、</span>
+                  </router-link>
+                </span>
+              </template>
+              <span v-else class="no-author">暂无作者信息</span>
             </div>
             <div class="meta-item" v-if="book.publisher">
               <el-icon><OfficeBuilding /></el-icon>
@@ -100,7 +114,7 @@ import type { Book } from '@/types'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, User, OfficeBuilding, Document, ShoppingCart, Star } from '@element-plus/icons-vue'
+import { ArrowLeft, User, OfficeBuilding, Document, ShoppingCart } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -262,6 +276,26 @@ function handleBuyNow() {
 
 .meta-item .el-icon {
   color: var(--primary-color);
+}
+
+.authors-list {
+  display: inline;
+}
+
+.author-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.author-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.no-author {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .book-price-section,

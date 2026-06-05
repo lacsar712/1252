@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -136,5 +136,29 @@ export const api = {
         instance.get('/coupons/my', { params }),
 
     validateCouponsForOrder: (cartItemIds: number[]): Promise<AvailableCouponResponse> =>
-        instance.post('/coupons/validate-for-order', { cart_item_ids: cartItemIds })
+        instance.post('/coupons/validate-for-order', { cart_item_ids: cartItemIds }),
+
+    getAuthors: (params?: { page?: number; page_size?: number; search?: string; is_active?: boolean }): Promise<AuthorListResponse> =>
+        instance.get('/authors', { params }),
+
+    getAuthor: (id: number): Promise<AuthorDetail> =>
+        instance.get(`/authors/${id}`),
+
+    getAuthorBooks: (authorId: number, params?: { page?: number; page_size?: number }): Promise<BookListResponse> =>
+        instance.get(`/authors/${authorId}/books`, { params }),
+
+    searchAuthors: (keyword: string, limit?: number): Promise<AuthorSearchResult[]> =>
+        instance.get('/authors/search', { params: { keyword, limit } }),
+
+    checkAuthorDelete: (authorId: number): Promise<AuthorBookCheckResponse> =>
+        instance.get(`/authors/${authorId}/check-delete`),
+
+    createAuthor: (author: AuthorCreate): Promise<Author> =>
+        instance.post('/authors', author),
+
+    updateAuthor: (id: number, author: AuthorUpdate): Promise<Author> =>
+        instance.put(`/authors/${id}`, author),
+
+    deleteAuthor: (id: number): Promise<void> =>
+        instance.delete(`/authors/${id}`)
 }

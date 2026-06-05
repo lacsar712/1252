@@ -59,6 +59,18 @@ const routes: RouteRecordRaw[] = [
                 name: 'Coupons',
                 component: () => import('@/views/Coupons.vue'),
                 meta: { title: '领券中心', requiresAuth: true }
+            },
+            {
+                path: 'authors',
+                name: 'Authors',
+                component: () => import('@/views/Authors.vue'),
+                meta: { title: '作者列表' }
+            },
+            {
+                path: 'authors/:id',
+                name: 'AuthorDetail',
+                component: () => import('@/views/AuthorDetail.vue'),
+                meta: { title: '作者详情' }
             }
         ]
     },

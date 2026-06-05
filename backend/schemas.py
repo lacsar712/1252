@@ -9,6 +9,59 @@ from datetime import datetime
 from models import CouponStatus, UserCouponStatus
 
 
+# ========== 作者相关 Schema ==========
+class AuthorBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="作者姓名")
+    avatar: Optional[str] = Field(None, max_length=500, description="头像URL")
+    bio: Optional[str] = Field(None, description="作者简介")
+    country: Optional[str] = Field(None, max_length=100, description="国家或地区")
+    birth_year: Optional[int] = Field(None, ge=0, le=3000, description="出生年份")
+    masterpieces: Optional[str] = Field(None, description="代表作说明")
+    is_active: bool = Field(True, description="展示状态")
+
+
+class AuthorCreate(AuthorBase):
+    pass
+
+
+class AuthorUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="作者姓名")
+    avatar: Optional[str] = Field(None, max_length=500, description="头像URL")
+    bio: Optional[str] = Field(None, description="作者简介")
+    country: Optional[str] = Field(None, max_length=100, description="国家或地区")
+    birth_year: Optional[int] = Field(None, ge=0, le=3000, description="出生年份")
+    masterpieces: Optional[str] = Field(None, description="代表作说明")
+    is_active: Optional[bool] = Field(None, description="展示状态")
+
+
+class AuthorResponse(AuthorBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuthorDetailResponse(AuthorResponse):
+    book_count: int = Field(0, description="作品数量")
+    category_distribution: List[dict] = Field([], description="分类分布")
+    books: List["BookResponse"] = Field([], description="关联图书")
+
+
+class AuthorListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[AuthorResponse]
+
+
+class AuthorBookCheckResponse(BaseModel):
+    can_delete: bool = Field(..., description="是否可以删除")
+    linked_books: int = Field(0, description="关联图书数量")
+    message: Optional[str] = Field(None, description="提示信息")
+
+
 # ========== 用户相关 Schema ==========
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
@@ -58,7 +111,7 @@ class BookBase(BaseModel):
 
 
 class BookCreate(BookBase):
-    pass
+    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
 
 
 class BookUpdate(BaseModel):
@@ -71,12 +124,14 @@ class BookUpdate(BaseModel):
     description: Optional[str] = None
     cover_image: Optional[str] = None
     category: Optional[str] = None
+    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
 
 
 class BookResponse(BookBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    authors: List[AuthorResponse] = Field([], description="关联作者列表")
 
     class Config:
         from_attributes = True
@@ -87,6 +142,9 @@ class BookListResponse(BaseModel):
     page: int
     page_size: int
     items: List[BookResponse]
+
+
+AuthorDetailResponse.model_rebuild()
 
 
 # ========== 购物车相关 Schema ==========
@@ -194,7 +252,7 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[OrderItemSnapshot]
-    used_coupon: Optional[UserCouponResponse] = None
+    used_coupon: Optional["UserCouponResponse"] = None
 
     class Config:
         from_attributes = True
@@ -294,3 +352,6 @@ class AvailableCouponResponse(BaseModel):
 
 class OrderCreateWithCoupon(OrderCreate):
     user_coupon_id: Optional[int] = Field(None, description="用户优惠券ID")
+
+
+OrderResponse.model_rebuild()

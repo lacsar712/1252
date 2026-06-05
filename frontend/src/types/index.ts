@@ -7,6 +7,65 @@ export interface User {
     created_at: string
 }
 
+export interface Author {
+    id: number
+    name: string
+    avatar: string | null
+    bio: string | null
+    country: string | null
+    birth_year: number | null
+    masterpieces: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface AuthorDetail extends Author {
+    book_count: number
+    category_distribution: { category: string; count: number }[]
+    books: Book[]
+}
+
+export interface AuthorListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Author[]
+}
+
+export interface AuthorCreate {
+    name: string
+    avatar?: string
+    bio?: string
+    country?: string
+    birth_year?: number
+    masterpieces?: string
+    is_active: boolean
+}
+
+export interface AuthorUpdate {
+    name?: string
+    avatar?: string
+    bio?: string
+    country?: string
+    birth_year?: number
+    masterpieces?: string
+    is_active?: boolean
+}
+
+export interface AuthorSearchResult {
+    id: number
+    name: string
+    country: string | null
+    avatar: string | null
+}
+
+export interface AuthorBookCheckResponse {
+    can_delete: boolean
+    linked_books: number
+    message: string | null
+}
+
 export interface Book {
     id: number
     title: string
@@ -20,6 +79,7 @@ export interface Book {
     category: string | null
     created_at: string
     updated_at: string
+    authors: Author[]
 }
 
 export interface BookListResponse {
@@ -39,6 +99,7 @@ export interface BookCreate {
     description?: string
     cover_image?: string
     category?: string
+    author_ids?: number[]
 }
 
 export interface LoginResponse {

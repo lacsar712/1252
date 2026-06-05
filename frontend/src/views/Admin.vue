@@ -310,6 +310,114 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="作者管理" name="authors">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>作者管理</h1>
+            <el-button type="primary" @click="handleAddAuthor">
+              <el-icon><Plus /></el-icon>
+              添加作者
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-input
+              v-model="authorSearchQuery"
+              placeholder="搜索作者姓名或国家..."
+              clearable
+              @keyup.enter="fetchAuthors"
+              style="max-width: 300px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="authorStatusFilter"
+              placeholder="展示状态"
+              clearable
+              style="width: 150px"
+              @change="fetchAuthors"
+            >
+              <el-option label="已启用" :value="true" />
+              <el-option label="已停用" :value="false" />
+            </el-select>
+            <el-button @click="fetchAuthors">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="authors"
+            v-loading="authorsLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column label="头像" width="70">
+              <template #default="{ row }">
+                <img
+                  :src="row.avatar || defaultAuthorAvatar"
+                  :alt="row.name"
+                  class="author-avatar"
+                  @error="handleAuthorAvatarError"
+                >
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="姓名" width="140">
+              <template #default="{ row }">
+                <span class="author-name">{{ row.name }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="country" label="国家/地区" width="120">
+              <template #default="{ row }">
+                <span>{{ row.country || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="birth_year" label="出生年份" width="100">
+              <template #default="{ row }">
+                <span>{{ row.birth_year || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="代表作" min-width="150">
+              <template #default="{ row }">
+                <span>{{ row.masterpieces || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="展示状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '已启用' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEditAuthor(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  :title="`确定要删除作者「${row.name}」吗？`"
+                  @confirm="handleDeleteAuthor(row)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="authorsCurrentPage"
+              v-model:page-size="authorsPageSize"
+              :total="authorsTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchAuthors"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
     
     <el-dialog
@@ -332,10 +440,38 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="作者" prop="author">
-              <el-input v-model="bookForm.author" placeholder="请输入作者" />
+              <el-input v-model="bookForm.author" placeholder="请输入作者显示文本" />
             </el-form-item>
           </el-col>
         </el-row>
+
+        <el-form-item label="关联作者" prop="author_ids">
+          <el-select
+            v-model="selectedAuthorIds"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索并选择作者（可多选）"
+            :remote-method="handleAuthorSearch"
+            :loading="authorSearchLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in authorSearchOptions"
+              :key="item.id"
+              :label="item.name + (item.country ? `（${item.country}）` : '')"
+              :value="item.id"
+            >
+              <div class="author-option">
+                <img :src="item.avatar || defaultAuthorAvatar" :alt="item.name" class="author-option-avatar" @error="handleAuthorOptionAvatarError" />
+                <span class="author-option-name">{{ item.name }}</span>
+                <span v-if="item.country" class="author-option-country">{{ item.country }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <span class="form-tip">从作者档案中选择，支持多选。若未选择，则仅显示作者文本。</span>
+        </el-form-item>
         
         <el-row :gutter="20">
           <el-col :span="12">
@@ -531,6 +667,84 @@
     </el-dialog>
 
     <el-dialog
+      v-model="authorDialogVisible"
+      :title="isAuthorEdit ? '编辑作者' : '添加作者'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="authorFormRef"
+        :model="authorForm"
+        :rules="authorRules"
+        label-width="100px"
+      >
+        <el-form-item label="作者姓名" prop="name">
+          <el-input v-model="authorForm.name" placeholder="请输入作者姓名" maxlength="100" show-word-limit />
+        </el-form-item>
+
+        <el-form-item label="头像URL" prop="avatar">
+          <el-input v-model="authorForm.avatar" placeholder="请输入头像图片URL（可选）" />
+          <div v-if="authorForm.avatar" class="avatar-preview">
+            <img :src="authorForm.avatar" alt="头像预览" @error="handleAuthorFormAvatarError" />
+          </div>
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="国家/地区" prop="country">
+              <el-input v-model="authorForm.country" placeholder="请输入国家或地区" maxlength="100" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="出生年份" prop="birth_year">
+              <el-input-number
+                v-model="authorForm.birth_year"
+                :min="0"
+                :max="3000"
+                :precision="0"
+                controls-position="right"
+                style="width: 100%"
+                placeholder="请输入出生年份"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="作者简介" prop="bio">
+          <el-input
+            v-model="authorForm.bio"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入作者简介（可选）"
+          />
+        </el-form-item>
+
+        <el-form-item label="代表作说明" prop="masterpieces">
+          <el-input
+            v-model="authorForm.masterpieces"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入代表作说明（可选）"
+          />
+        </el-form-item>
+
+        <el-form-item label="展示状态" prop="is_active">
+          <el-radio-group v-model="authorForm.is_active">
+            <el-radio :value="true">启用</el-radio>
+            <el-radio :value="false">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="authorDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="authorSubmitting" @click="handleAuthorSubmit">
+          {{ isAuthorEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="orderDetailVisible"
       title="订单详情"
       width="800px"
@@ -718,7 +932,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 
@@ -806,6 +1020,38 @@ const couponRules: FormRules = {
   limit_per_user: [{ required: true, message: '请输入每人限领次数', trigger: 'blur' }]
 }
 
+const authorsLoading = ref(false)
+const authors = ref<Author[]>([])
+const authorsTotal = ref(0)
+const authorsCurrentPage = ref(1)
+const authorsPageSize = ref(10)
+const authorSearchQuery = ref('')
+const authorStatusFilter = ref<boolean | ''>('')
+const authorDialogVisible = ref(false)
+const isAuthorEdit = ref(false)
+const authorEditingId = ref<number | null>(null)
+const authorSubmitting = ref(false)
+const authorFormRef = ref<FormInstance>()
+const defaultAuthorAvatar = 'https://via.placeholder.com/60x60/8b5cf6/ffffff?text=Author'
+
+const authorSearchLoading = ref(false)
+const authorSearchOptions = ref<AuthorSearchResult[]>([])
+const selectedAuthorIds = ref<number[]>([])
+
+const authorForm = reactive<AuthorCreate>({
+  name: '',
+  avatar: '',
+  bio: '',
+  country: '',
+  birth_year: undefined,
+  masterpieces: '',
+  is_active: true
+})
+
+const authorRules: FormRules = {
+  name: [{ required: true, message: '请输入作者姓名', trigger: 'blur' }]
+}
+
 const bookForm = reactive<BookCreate>({
   title: '',
   author: '',
@@ -834,6 +1080,9 @@ watch(activeTab, (newTab) => {
   }
   if (newTab === 'coupons' && coupons.value.length === 0) {
     fetchCoupons()
+  }
+  if (newTab === 'authors' && authors.value.length === 0) {
+    fetchAuthors()
   }
 })
 
@@ -871,30 +1120,6 @@ async function fetchOrders() {
   }
 }
 
-function handleAdd() {
-  isEdit.value = false
-  editingId.value = null
-  resetForm()
-  dialogVisible.value = true
-}
-
-function handleEdit(book: Book) {
-  isEdit.value = true
-  editingId.value = book.id
-  Object.assign(bookForm, {
-    title: book.title,
-    author: book.author,
-    publisher: book.publisher || '',
-    isbn: book.isbn || '',
-    price: book.price,
-    stock: book.stock,
-    description: book.description || '',
-    cover_image: book.cover_image || '',
-    category: book.category || ''
-  })
-  dialogVisible.value = true
-}
-
 async function handleDelete(id: number) {
   try {
     await api.deleteBook(id)
@@ -903,31 +1128,6 @@ async function handleDelete(id: number) {
   } catch (error) {
     console.error('删除失败:', error)
   }
-}
-
-async function handleSubmit() {
-  if (!bookFormRef.value) return
-  
-  await bookFormRef.value.validate(async (valid: boolean) => {
-    if (!valid) return
-    
-    submitting.value = true
-    try {
-      if (isEdit.value && editingId.value) {
-        await api.updateBook(editingId.value, bookForm)
-        ElMessage.success('更新成功')
-      } else {
-        await api.createBook(bookForm)
-        ElMessage.success('添加成功')
-      }
-      dialogVisible.value = false
-      fetchBooks()
-    } catch (error) {
-      console.error('操作失败:', error)
-    } finally {
-      submitting.value = false
-    }
-  })
 }
 
 function resetForm() {
@@ -1170,6 +1370,184 @@ function getCouponStatusText(status: CouponStatusType): string {
   }
   return map[status] || status
 }
+
+async function fetchAuthors() {
+  authorsLoading.value = true
+  try {
+    const response = await api.getAuthors({
+      page: authorsCurrentPage.value,
+      page_size: authorsPageSize.value,
+      search: authorSearchQuery.value || undefined,
+      is_active: authorStatusFilter.value === '' ? undefined : authorStatusFilter.value
+    })
+    authors.value = response.items
+    authorsTotal.value = response.total
+  } catch (error) {
+    console.error('获取作者列表失败:', error)
+  } finally {
+    authorsLoading.value = false
+  }
+}
+
+function handleAddAuthor() {
+  isAuthorEdit.value = false
+  authorEditingId.value = null
+  resetAuthorForm()
+  authorDialogVisible.value = true
+}
+
+function handleEditAuthor(author: Author) {
+  isAuthorEdit.value = true
+  authorEditingId.value = author.id
+  Object.assign(authorForm, {
+    name: author.name,
+    avatar: author.avatar || '',
+    bio: author.bio || '',
+    country: author.country || '',
+    birth_year: author.birth_year || undefined,
+    masterpieces: author.masterpieces || '',
+    is_active: author.is_active
+  })
+  authorDialogVisible.value = true
+}
+
+async function handleDeleteAuthor(author: Author) {
+  try {
+    const checkResult = await api.checkAuthorDelete(author.id)
+    if (!checkResult.can_delete) {
+      ElMessage.warning(checkResult.message || '该作者有关联的图书，无法删除')
+      return
+    }
+    await api.deleteAuthor(author.id)
+    ElMessage.success('删除成功')
+    fetchAuthors()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function handleAuthorSubmit() {
+  if (!authorFormRef.value) return
+  
+  await authorFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    authorSubmitting.value = true
+    try {
+      if (isAuthorEdit.value && authorEditingId.value) {
+        const updateData: AuthorUpdate = { ...authorForm }
+        await api.updateAuthor(authorEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createAuthor(authorForm)
+        ElMessage.success('添加成功')
+      }
+      authorDialogVisible.value = false
+      fetchAuthors()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      authorSubmitting.value = false
+    }
+  })
+}
+
+function resetAuthorForm() {
+  Object.assign(authorForm, {
+    name: '',
+    avatar: '',
+    bio: '',
+    country: '',
+    birth_year: undefined,
+    masterpieces: '',
+    is_active: true
+  })
+}
+
+async function handleAuthorSearch(query: string) {
+  if (!query || query.trim() === '') {
+    authorSearchOptions.value = []
+    return
+  }
+  authorSearchLoading.value = true
+  try {
+    authorSearchOptions.value = await api.searchAuthors(query.trim(), 20)
+  } catch (error) {
+    console.error('搜索作者失败:', error)
+  } finally {
+    authorSearchLoading.value = false
+  }
+}
+
+function handleAuthorAvatarError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultAuthorAvatar
+}
+
+function handleAuthorFormAvatarError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultAuthorAvatar
+}
+
+function handleAuthorOptionAvatarError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultAuthorAvatar
+}
+
+function handleEdit(book: Book) {
+  isEdit.value = true
+  editingId.value = book.id
+  Object.assign(bookForm, {
+    title: book.title,
+    author: book.author,
+    publisher: book.publisher || '',
+    isbn: book.isbn || '',
+    price: book.price,
+    stock: book.stock,
+    description: book.description || '',
+    cover_image: book.cover_image || '',
+    category: book.category || ''
+  })
+  selectedAuthorIds.value = book.authors ? book.authors.map(a => a.id) : []
+  dialogVisible.value = true
+}
+
+function handleAdd() {
+  isEdit.value = false
+  editingId.value = null
+  resetForm()
+  selectedAuthorIds.value = []
+  dialogVisible.value = true
+}
+
+async function handleSubmit() {
+  if (!bookFormRef.value) return
+  
+  await bookFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    submitting.value = true
+    try {
+      const submitData: BookCreate = {
+        ...bookForm,
+        author_ids: selectedAuthorIds.value.length > 0 ? selectedAuthorIds.value : undefined
+      }
+      if (isEdit.value && editingId.value) {
+        await api.updateBook(editingId.value, submitData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createBook(submitData)
+        ElMessage.success('添加成功')
+      }
+      dialogVisible.value = false
+      fetchBooks()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      submitting.value = false
+    }
+  })
+}
 </script>
 
 <style scoped>
@@ -1324,5 +1702,51 @@ function getCouponStatusText(status: CouponStatusType): string {
 
 .final-amount {
   font-size: 14px;
+}
+
+.author-avatar {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.author-name {
+  font-weight: 500;
+}
+
+.avatar-preview {
+  margin-top: 8px;
+}
+
+.avatar-preview img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.author-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.author-option-avatar {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.author-option-name {
+  font-weight: 500;
+}
+
+.author-option-country {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 4px;
 }
 </style>

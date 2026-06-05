@@ -56,7 +56,15 @@
             </div>
             <div class="book-info">
               <h4 class="book-title" :title="book.title" @click="router.push(`/books/${book.id}`)">{{ book.title }}</h4>
-              <p class="book-author" @click="router.push(`/books/${book.id}`)">{{ book.author }}</p>
+              <p class="book-author" @click="router.push(`/books/${book.id}`)">
+                <template v-if="book.authors && book.authors.length > 0">
+                  {{ book.authors.map(a => a.name).join('、') }}
+                </template>
+                <template v-else-if="book.author">
+                  {{ book.author }}
+                </template>
+                <span v-else class="no-author">暂无作者</span>
+              </p>
               <p class="book-publisher" v-if="book.publisher" @click="router.push(`/books/${book.id}`)">{{ book.publisher }}</p>
               <div class="book-meta">
                 <span class="book-price">¥{{ book.price.toFixed(2) }}</span>
@@ -291,6 +299,11 @@ async function handleAddToCart(book: Book) {
   font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 4px;
+}
+
+.book-author .no-author {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .book-publisher {

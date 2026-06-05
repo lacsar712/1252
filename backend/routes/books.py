@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from database import get_db
-from models import Book, User
+from models import Book, User, Author
 from schemas import BookCreate, BookUpdate, BookResponse, BookListResponse
 from auth import get_current_admin_user, get_current_user
 
@@ -93,7 +93,21 @@ def create_book(
                 detail="ISBN已存在"
             )
     
-    db_book = Book(**book.model_dump())
+    book_data = book.model_dump()
+    author_ids = book_data.pop('author_ids', None)
+    
+    db_book = Book(**book_data)
+    
+    # 处理多作者关联
+    if author_ids:
+        authors = db.query(Author).filter(Author.id.in_(author_ids)).all()
+        if len(authors) != len(author_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="部分作者不存在"
+            )
+        db_book.authors = authors
+    
     db.add(db_book)
     db.commit()
     db.refresh(db_book)
@@ -119,8 +133,23 @@ def update_book(
     
     # 更新字段
     update_data = book_update.model_dump(exclude_unset=True)
+    author_ids = update_data.pop('author_ids', None)
+    
     for field, value in update_data.items():
         setattr(db_book, field, value)
+    
+    # 处理多作者关联更新
+    if author_ids is not None:
+        if len(author_ids) > 0:
+            authors = db.query(Author).filter(Author.id.in_(author_ids)).all()
+            if len(authors) != len(author_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="部分作者不存在"
+                )
+            db_book.authors = authors
+        else:
+            db_book.authors = []
     
     db.commit()
     db.refresh(db_book)

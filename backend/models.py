@@ -2,12 +2,38 @@
 """
 数据库模型定义
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
 Base = declarative_base()
+
+
+book_author = Table(
+    'book_author',
+    Base.metadata,
+    Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
+    Column('author_id', Integer, ForeignKey('authors.id'), primary_key=True)
+)
+
+
+class Author(Base):
+    """作者模型"""
+    __tablename__ = "authors"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, index=True)
+    avatar = Column(String(500), nullable=True)
+    bio = Column(Text, nullable=True)
+    country = Column(String(100), nullable=True)
+    birth_year = Column(Integer, nullable=True)
+    masterpieces = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    books = relationship("Book", secondary=book_author, back_populates="authors")
 
 
 class User(Base):
@@ -40,6 +66,8 @@ class Book(Base):
     category = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    authors = relationship("Author", secondary=book_author, back_populates="books")
 
 
 class CartItem(Base):
