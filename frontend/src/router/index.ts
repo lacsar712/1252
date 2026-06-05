@@ -34,7 +34,25 @@ const routes: RouteRecordRaw[] = [
                 path: 'cart',
                 name: 'Cart',
                 component: () => import('@/views/Cart.vue'),
-                meta: { title: '购物车' }
+                meta: { title: '购物车', requiresAuth: true }
+            },
+            {
+                path: 'orders',
+                name: 'Orders',
+                component: () => import('@/views/Orders.vue'),
+                meta: { title: '我的订单', requiresAuth: true }
+            },
+            {
+                path: 'orders/:id',
+                name: 'OrderDetail',
+                component: () => import('@/views/OrderDetail.vue'),
+                meta: { title: '订单详情', requiresAuth: true }
+            },
+            {
+                path: 'checkout',
+                name: 'Checkout',
+                component: () => import('@/views/Checkout.vue'),
+                meta: { title: '确认订单', requiresAuth: true }
             }
         ]
     },
@@ -58,7 +76,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
     // 更新页面标题
     document.title = `${to.meta.title || '在线书店'} - 现代化在线书店`
 
@@ -70,6 +88,14 @@ router.beforeEach((to, from, next) => {
             next({ name: 'Login', query: { redirect: to.fullPath } })
         } else if (!userStore.isAdmin) {
             next({ name: 'Home' })
+        } else {
+            next()
+        }
+    }
+    // 需要登录的页面
+    else if (to.meta.requiresAuth) {
+        if (!userStore.isLoggedIn) {
+            next({ name: 'Login', query: { redirect: to.fullPath } })
         } else {
             next()
         }

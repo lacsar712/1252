@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api'
 import { ElMessage } from 'element-plus'
-import type { CartListResponse, CartItem, Book } from '@/types'
+import type { CartListResponse, CartItem } from '@/types'
 import { useUserStore } from '@/stores/user'
 
 const GUEST_CART_KEY = 'guest_cart'

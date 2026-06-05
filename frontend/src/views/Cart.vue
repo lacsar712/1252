@@ -385,14 +385,14 @@ async function handleClearCart() {
 function handleCheckout() {
   if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录')
-    router.push({ name: 'Login', query: { redirect: '/cart' })
+    router.push({ name: 'Login', query: { redirect: '/cart' } })
     return
   }
   if (cartStore.selectedCount === 0) {
     ElMessage.warning('请选择要结算的商品')
     return
   }
-  ElMessage.success('结算功能开发中...')
+  router.push('/checkout')
 }
 </script>
 

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCreate, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -10,7 +10,6 @@ const instance = axios.create({
     }
 })
 
-// 请求拦截器
 instance.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token')
@@ -24,7 +23,6 @@ instance.interceptors.request.use(
     }
 )
 
-// 响应拦截器
 instance.interceptors.response.use(
     (response) => response.data,
     (error) => {
@@ -35,7 +33,6 @@ instance.interceptors.response.use(
 )
 
 export const api = {
-    // 认证相关
     login: (username: string, password: string): Promise<LoginResponse> =>
         instance.post('/auth/login', { username, password }),
 
@@ -45,7 +42,6 @@ export const api = {
     getCurrentUser: (): Promise<User> =>
         instance.get('/auth/me'),
 
-    // 图书相关
     getBooks: (params?: { page?: number; page_size?: number; search?: string; category?: string }): Promise<BookListResponse> =>
         instance.get('/books', { params }),
 
@@ -64,7 +60,6 @@ export const api = {
     getCategories: (): Promise<string[]> =>
         instance.get('/books/categories/list'),
 
-    // 购物车相关
     getCart: (): Promise<CartListResponse> =>
         instance.get('/cart'),
 
@@ -93,5 +88,26 @@ export const api = {
         instance.delete('/cart/clear/invalid'),
 
     clearCart: (): Promise<CartListResponse> =>
-        instance.delete('/cart')
+        instance.delete('/cart'),
+
+    createOrder: (data: OrderCreate): Promise<Order> =>
+        instance.post('/orders', data),
+
+    getMyOrders: (params?: { status?: OrderStatus; page?: number; page_size?: number }): Promise<OrderListResponse> =>
+        instance.get('/orders/my', { params }),
+
+    getOrderDetail: (orderId: number): Promise<Order> =>
+        instance.get(`/orders/${orderId}`),
+
+    cancelOrder: (orderId: number, data: OrderCancel): Promise<Order> =>
+        instance.post(`/orders/${orderId}/cancel`, data),
+
+    shipOrder: (orderId: number, data: OrderShip): Promise<Order> =>
+        instance.post(`/orders/${orderId}/ship`, data),
+
+    getAllOrders: (params?: { status?: OrderStatus; page?: number; page_size?: number }): Promise<OrderListResponse> =>
+        instance.get('/orders', { params }),
+
+    updateOrderAdmin: (orderId: number, data: OrderAdminUpdate): Promise<Order> =>
+        instance.patch(`/orders/${orderId}/admin`, data)
 }

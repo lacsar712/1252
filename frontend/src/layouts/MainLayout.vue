@@ -17,6 +17,10 @@
             <el-icon><Collection /></el-icon>
             <span>图书列表</span>
           </router-link>
+          <router-link v-if="userStore.isLoggedIn" to="/orders" class="nav-link" active-class="active">
+            <el-icon><List /></el-icon>
+            <span>我的订单</span>
+          </router-link>
           <router-link v-if="userStore.isAdmin" to="/admin" class="nav-link" active-class="active">
             <el-icon><Setting /></el-icon>
             <span>后台管理</span>
@@ -44,6 +48,10 @@
                   <el-dropdown-item>
                     <el-icon><User /></el-icon>
                     {{ userStore.isAdmin ? '管理员' : '普通用户' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/orders')">
+                    <el-icon><List /></el-icon>
+                    我的订单
                   </el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">
                     <el-icon><SwitchButton /></el-icon>
@@ -87,6 +95,7 @@ import {
   Reading,
   HomeFilled,
   Collection,
+  List,
   Setting,
   ArrowDown,
   User,

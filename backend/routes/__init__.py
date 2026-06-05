@@ -5,5 +5,6 @@
 from routes.auth import router as auth_router
 from routes.books import router as books_router
 from routes.cart import router as cart_router
+from routes.orders import router as orders_router
 
-__all__ = ["auth_router", "books_router", "cart_router"]
+__all__ = ["auth_router", "books_router", "cart_router", "orders_router"]

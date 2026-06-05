@@ -2,7 +2,8 @@
 """
 数据库模型定义
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -52,3 +53,56 @@ class CartItem(Base):
     selected = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class OrderStatus:
+    """订单状态枚举"""
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
+
+class Order(Base):
+    """订单模型"""
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    order_no = Column(String(50), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
+    total_amount = Column(Float, nullable=False)
+    status = Column(String(20), default=OrderStatus.PENDING, nullable=False)
+    receiver_name = Column(String(50), nullable=False)
+    receiver_phone = Column(String(20), nullable=False)
+    receiver_address = Column(String(500), nullable=False)
+    remark = Column(Text, nullable=True)
+    cancel_reason = Column(Text, nullable=True)
+    admin_remark = Column(Text, nullable=True)
+    tracking_company = Column(String(100), nullable=True)
+    tracking_number = Column(String(100), nullable=True)
+    paid_at = Column(DateTime, nullable=True)
+    shipped_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+
+
+class OrderItem(Base):
+    """订单项模型"""
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False)
+    book_title = Column(String(200), nullable=False)
+    book_author = Column(String(100), nullable=False)
+    book_price = Column(Float, nullable=False)
+    book_cover = Column(String(500), nullable=True)
+    quantity = Column(Integer, nullable=False)
+    subtotal = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    order = relationship("Order", back_populates="items")

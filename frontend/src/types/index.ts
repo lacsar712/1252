@@ -83,3 +83,69 @@ export interface CartItemSelectedUpdate {
 export interface CartItemBatchDelete {
     cart_item_ids: number[]
 }
+
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+
+export interface OrderItemSnapshot {
+    book_id: number
+    book_title: string
+    book_author: string
+    book_price: number
+    book_cover: string | null
+    quantity: number
+    subtotal: number
+}
+
+export interface Order {
+    id: number
+    order_no: string
+    user_id: number
+    total_amount: number
+    status: OrderStatus
+    receiver_name: string
+    receiver_phone: string
+    receiver_address: string
+    remark: string | null
+    cancel_reason: string | null
+    admin_remark: string | null
+    tracking_company: string | null
+    tracking_number: string | null
+    paid_at: string | null
+    shipped_at: string | null
+    delivered_at: string | null
+    created_at: string
+    updated_at: string
+    items: OrderItemSnapshot[]
+}
+
+export interface OrderListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Order[]
+}
+
+export interface OrderCreate {
+    receiver_name: string
+    receiver_phone: string
+    receiver_address: string
+    remark?: string
+    cart_item_ids?: number[]
+}
+
+export interface OrderCancel {
+    cancel_reason: string
+}
+
+export interface OrderShip {
+    tracking_company: string
+    tracking_number: string
+    admin_remark?: string
+}
+
+export interface OrderAdminUpdate {
+    status?: OrderStatus
+    admin_remark?: string
+    tracking_company?: string
+    tracking_number?: string
+}
