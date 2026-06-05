@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -187,5 +187,44 @@ export const api = {
         instance.put(`/publishers/${id}`, publisher),
 
     deletePublisher: (id: number): Promise<void> =>
-        instance.delete(`/publishers/${id}`)
+        instance.delete(`/publishers/${id}`),
+
+    getUnreadCount: (): Promise<UnreadCountResponse> =>
+        instance.get('/messages/unread-count'),
+
+    getMessages: (params?: { status?: MessageStatusFilter; type?: MessageType; page?: number; page_size?: number }): Promise<MessageListResponse> =>
+        instance.get('/messages', { params }),
+
+    getMessageDetail: (messageId: number): Promise<Message> =>
+        instance.get(`/messages/${messageId}`),
+
+    markMessageRead: (messageId: number): Promise<{ message: string }> =>
+        instance.post(`/messages/${messageId}/read`),
+
+    markAllMessagesRead: (type?: MessageType): Promise<{ message: string }> =>
+        instance.post('/messages/read-all', null, { params: { type } }),
+
+    deleteMessage: (messageId: number): Promise<{ message: string }> =>
+        instance.delete(`/messages/${messageId}`),
+
+    batchDeleteMessages: (data: MessageBatchDeleteRequest): Promise<{ message: string }> =>
+        instance.post('/messages/batch-delete', data),
+
+    getAdminMessages: (params?: { type?: MessageType; page?: number; page_size?: number }): Promise<MessageListResponse> =>
+        instance.get('/admin/messages', { params }),
+
+    getAdminUsers: (search?: string): Promise<User[]> =>
+        instance.get('/admin/messages/users', { params: { search } }),
+
+    createAnnouncement: (data: AnnouncementCreate): Promise<Message> =>
+        instance.post('/admin/messages/announcement', data),
+
+    toggleAnnouncementActive: (messageId: number): Promise<{ message: string; is_active: boolean }> =>
+        instance.put(`/admin/messages/${messageId}/toggle-active`),
+
+    deleteAnnouncement: (messageId: number): Promise<{ message: string }> =>
+        instance.delete(`/admin/messages/${messageId}`),
+
+    getMessageStats: (): Promise<MessageStatsResponse> =>
+        instance.get('/admin/messages/stats')
 }

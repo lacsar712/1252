@@ -20,6 +20,8 @@ from routes.orders import router as orders_router
 from routes.coupons import router as coupons_router
 from routes.authors import router as authors_router
 from routes.publishers import router as publishers_router
+from routes.messages import router as messages_router
+from routes.admin_messages import router as admin_messages_router
 
 # 配置日志
 logging.basicConfig(
@@ -79,6 +81,8 @@ app.include_router(orders_router)
 app.include_router(coupons_router)
 app.include_router(authors_router)
 app.include_router(publishers_router)
+app.include_router(messages_router)
+app.include_router(admin_messages_router)
 
 # 挂载静态文件
 # 确保static目录存在

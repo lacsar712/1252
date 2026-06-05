@@ -9,5 +9,7 @@ from routes.orders import router as orders_router
 from routes.coupons import router as coupons_router
 from routes.authors import router as authors_router
 from routes.publishers import router as publishers_router
+from routes.messages import router as messages_router
+from routes.admin_messages import router as admin_messages_router
 
-__all__ = ["auth_router", "books_router", "cart_router", "orders_router", "coupons_router", "authors_router", "publishers_router"]
+__all__ = ["auth_router", "books_router", "cart_router", "orders_router", "coupons_router", "authors_router", "publishers_router", "messages_router", "admin_messages_router"]

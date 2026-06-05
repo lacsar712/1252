@@ -529,6 +529,115 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="消息管理" name="messages">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>消息管理</h1>
+            <el-button type="primary" @click="openAnnouncementDialog">
+              <el-icon><Plus /></el-icon>
+              发布公告
+            </el-button>
+          </div>
+
+          <div class="message-stats">
+            <el-row :gutter="16">
+              <el-col :span="6">
+                <div class="stat-item">
+                  <div class="stat-label">公告总数</div>
+                  <div class="stat-value">{{ messageStats.total_messages }}</div>
+                </div>
+              </el-col>
+              <el-col :span="6">
+                <div class="stat-item">
+                  <div class="stat-label">生效中</div>
+                  <div class="stat-value">{{ messageStats.active_messages }}</div>
+                </div>
+              </el-col>
+              <el-col :span="6">
+                <div class="stat-item">
+                  <div class="stat-label">接收人次</div>
+                  <div class="stat-value">{{ messageStats.total_recipients }}</div>
+                </div>
+              </el-col>
+              <el-col :span="6">
+                <div class="stat-item">
+                  <div class="stat-label">阅读率</div>
+                  <div class="stat-value">{{ messageStats.read_rate.toFixed(1) }}%</div>
+                </div>
+              </el-col>
+            </el-row>
+          </div>
+          
+          <el-table
+            :data="adminMessages"
+            v-loading="adminMessagesLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="title" label="标题" min-width="200" />
+            <el-table-column label="内容" min-width="250">
+              <template #default="{ row }">
+                <span class="content-preview">{{ row.content }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="recipient_type" label="发送对象" width="120">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.recipient_type === 'all_users' ? 'success' : 'warning'">
+                  {{ row.recipient_type === 'all_users' ? '全体用户' : '指定用户' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="有效期" width="280">
+              <template #default="{ row }">
+                <span v-if="row.valid_from && row.valid_to">
+                  {{ formatDate(row.valid_from) }} ~ {{ formatDate(row.valid_to) }}
+                </span>
+                <span v-else>永久有效</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="sender_name" label="发布人" width="100" />
+            <el-table-column prop="created_at" label="发布时间" width="180">
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '生效中' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="toggleMessageActive(row)">
+                  {{ row.is_active ? '停用' : '启用' }}
+                </el-button>
+                <el-popconfirm
+                  title="确定要删除此公告吗？"
+                  @confirm="handleDeleteAnnouncement(row.id)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="adminMessagesCurrentPage"
+              v-model:page-size="adminMessagesPageSize"
+              :total="adminMessagesTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchAdminMessages"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
     
     <el-dialog
@@ -1151,15 +1260,119 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="announcementDialogVisible"
+      title="发布公告"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="announcementFormRef"
+        :model="announcementForm"
+        :rules="announcementRules"
+        label-width="100px"
+      >
+        <el-form-item label="公告标题" prop="title">
+          <el-input 
+            v-model="announcementForm.title" 
+            placeholder="请输入公告标题" 
+            maxlength="100" 
+            show-word-limit 
+          />
+        </el-form-item>
+
+        <el-form-item label="发送对象" prop="recipient_type">
+          <el-radio-group v-model="announcementForm.recipient_type">
+            <el-radio value="all_users">全体用户</el-radio>
+            <el-radio value="specific_users">指定用户</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item 
+          v-if="announcementForm.recipient_type === 'specific_users'" 
+          label="选择用户"
+          prop="user_ids"
+        >
+          <el-select
+            v-model="selectedUserIds"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索并选择用户（可多选）"
+            :remote-method="fetchAdminUsers"
+            :loading="adminUsersLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="user in adminUsers"
+              :key="user.id"
+              :label="`${user.username} (${user.email})`"
+              :value="user.id"
+            >
+              <div class="user-option">
+                <el-icon><User /></el-icon>
+                <span class="user-option-name">{{ user.username }}</span>
+                <span class="user-option-email">{{ user.email }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="有效期开始" prop="valid_from">
+              <el-date-picker
+                v-model="announcementForm.valid_from"
+                type="datetime"
+                placeholder="选择开始时间（可选）"
+                style="width: 100%"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="有效期结束" prop="valid_to">
+              <el-date-picker
+                v-model="announcementForm.valid_to"
+                type="datetime"
+                placeholder="选择结束时间（可选）"
+                style="width: 100%"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="公告内容" prop="content">
+          <el-input
+            v-model="announcementForm.content"
+            type="textarea"
+            :rows="6"
+            placeholder="请输入公告内容"
+            maxlength="2000"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="announcementDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="announcementSubmitting" @click="handleAnnouncementSubmit">
+          发布公告
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, User } from '@element-plus/icons-vue'
 
 const activeTab = ref('books')
 
@@ -1310,6 +1523,41 @@ const publisherRules: FormRules = {
   name: [{ required: true, message: '请输入出版社名称', trigger: 'blur' }]
 }
 
+const adminMessagesLoading = ref(false)
+const adminMessages = ref<Message[]>([])
+const adminMessagesTotal = ref(0)
+const adminMessagesCurrentPage = ref(1)
+const adminMessagesPageSize = ref(10)
+
+const messageStats = reactive<MessageStatsResponse>({
+  total_messages: 0,
+  active_messages: 0,
+  total_recipients: 0,
+  read_recipients: 0,
+  read_rate: 0
+})
+
+const announcementDialogVisible = ref(false)
+const announcementSubmitting = ref(false)
+const announcementFormRef = ref<FormInstance>()
+const adminUsers = ref<User[]>([])
+const adminUsersLoading = ref(false)
+const selectedUserIds = ref<number[]>([])
+
+const announcementForm = reactive<AnnouncementCreate>({
+  title: '',
+  content: '',
+  recipient_type: 'all_users',
+  valid_from: '',
+  valid_to: ''
+})
+
+const announcementRules: FormRules = {
+  title: [{ required: true, message: '请输入公告标题', trigger: 'blur' }],
+  content: [{ required: true, message: '请输入公告内容', trigger: 'blur' }],
+  recipient_type: [{ required: true, message: '请选择发送对象', trigger: 'change' }]
+}
+
 const bookForm = reactive<BookCreate>({
   title: '',
   author: '',
@@ -1344,6 +1592,10 @@ watch(activeTab, (newTab) => {
   }
   if (newTab === 'publishers' && publishers.value.length === 0) {
     fetchPublishers()
+  }
+  if (newTab === 'messages') {
+    fetchAdminMessages()
+    fetchMessageStats()
   }
 })
 
@@ -1982,6 +2234,108 @@ async function handleSubmit() {
     }
   })
 }
+
+async function fetchAdminMessages() {
+  adminMessagesLoading.value = true
+  try {
+    const response = await api.getAdminMessages({
+      page: adminMessagesCurrentPage.value,
+      page_size: adminMessagesPageSize.value
+    })
+    adminMessages.value = response.items
+    adminMessagesTotal.value = response.total
+  } catch (error) {
+    console.error('获取公告列表失败:', error)
+  } finally {
+    adminMessagesLoading.value = false
+  }
+}
+
+async function fetchMessageStats() {
+  try {
+    const response = await api.getMessageStats()
+    Object.assign(messageStats, response)
+  } catch (error) {
+    console.error('获取消息统计失败:', error)
+  }
+}
+
+async function fetchAdminUsers(search?: string) {
+  adminUsersLoading.value = true
+  try {
+    adminUsers.value = await api.getAdminUsers(search)
+  } catch (error) {
+    console.error('获取用户列表失败:', error)
+  } finally {
+    adminUsersLoading.value = false
+  }
+}
+
+function openAnnouncementDialog() {
+  resetAnnouncementForm()
+  selectedUserIds.value = []
+  fetchAdminUsers()
+  announcementDialogVisible.value = true
+}
+
+function resetAnnouncementForm() {
+  Object.assign(announcementForm, {
+    title: '',
+    content: '',
+    recipient_type: 'all_users',
+    valid_from: '',
+    valid_to: ''
+  })
+}
+
+async function handleAnnouncementSubmit() {
+  if (!announcementFormRef.value) return
+  
+  await announcementFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    announcementSubmitting.value = true
+    try {
+      const submitData: AnnouncementCreate = {
+        ...announcementForm,
+        user_ids: announcementForm.recipient_type === 'specific_users' && selectedUserIds.value.length > 0 
+          ? selectedUserIds.value 
+          : undefined
+      }
+      await api.createAnnouncement(submitData)
+      ElMessage.success('公告发布成功')
+      announcementDialogVisible.value = false
+      fetchAdminMessages()
+      fetchMessageStats()
+    } catch (error) {
+      console.error('发布公告失败:', error)
+    } finally {
+      announcementSubmitting.value = false
+    }
+  })
+}
+
+async function toggleMessageActive(message: Message) {
+  try {
+    await api.toggleAnnouncementActive(message.id)
+    ElMessage.success(message.is_active ? '已停用' : '已启用')
+    fetchAdminMessages()
+    fetchMessageStats()
+  } catch (error) {
+    console.error('操作失败:', error)
+  }
+}
+
+async function handleDeleteAnnouncement(id: number) {
+  try {
+    await api.deleteAnnouncement(id)
+    ElMessage.success('删除成功')
+    fetchAdminMessages()
+    fetchMessageStats()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
 </script>
 
 <style scoped>
@@ -2256,5 +2610,54 @@ async function handleSubmit() {
   font-size: 12px;
   margin-top: 4px;
   display: block;
+}
+
+.message-stats {
+  margin-bottom: 8px;
+}
+
+.stat-item {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.content-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+.user-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-option-name {
+  font-weight: 500;
+}
+
+.user-option-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 4px;
 }
 </style>

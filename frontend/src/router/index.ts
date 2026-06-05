@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
                 name: 'PublisherDetail',
                 component: () => import('@/views/PublisherDetail.vue'),
                 meta: { title: '出版社详情' }
+            },
+            {
+                path: 'messages',
+                name: 'Messages',
+                component: () => import('@/views/Messages.vue'),
+                meta: { title: '消息中心', requiresAuth: true }
             }
         ]
     },

@@ -213,3 +213,56 @@ class UserCoupon(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     coupon = relationship("Coupon", back_populates="user_coupons")
+
+
+class MessageType:
+    """消息类型枚举"""
+    ORDER_STATUS = "order_status"
+    DELIVERY_REMINDER = "delivery_reminder"
+    ANNOUNCEMENT = "announcement"
+    ACCOUNT_SECURITY = "account_security"
+
+
+class MessageRecipientType:
+    """消息接收者类型枚举"""
+    ALL_USERS = "all_users"
+    SPECIFIC_USERS = "specific_users"
+
+
+class Message(Base):
+    """消息主体模型"""
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    type = Column(String(50), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    recipient_type = Column(String(20), default=MessageRecipientType.SPECIFIC_USERS, nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    valid_from = Column(DateTime, nullable=True)
+    valid_to = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    order = relationship("Order")
+    recipients = relationship("MessageRecipient", back_populates="message", cascade="all, delete-orphan")
+
+
+class MessageRecipient(Base):
+    """消息接收者模型（维护阅读状态和删除状态）"""
+    __tablename__ = "message_recipients"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    message_id = Column(Integer, ForeignKey("messages.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    message = relationship("Message", back_populates="recipients")
+    user = relationship("User")

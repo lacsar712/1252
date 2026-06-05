@@ -27,6 +27,7 @@ from schemas import (
     CouponResponse
 )
 from auth import get_current_active_user, get_current_admin_user
+from message_service import send_order_status_message, send_delivery_reminder
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/orders", tags=["订单管理"])
@@ -411,11 +412,19 @@ def cancel_order(
                 user_coupon.used_at = None
                 logger.info(f"优惠券已退回: 用户 {current_user.username}, 用户优惠券ID {user_coupon.id}")
 
+        old_status = order.status
         order.status = OrderStatus.CANCELLED
         order.cancel_reason = cancel_data.cancel_reason
 
         db.commit()
         db.refresh(order)
+
+        send_order_status_message(
+            db=db,
+            order=order,
+            old_status=old_status,
+            new_status=order.status
+        )
 
         logger.info(f"订单取消成功: 用户 {current_user.username}, 订单号 {order.order_no}, 原因: {cancel_data.cancel_reason}")
         return _get_order_response(db, order)
@@ -487,6 +496,9 @@ def update_order_admin(
         OrderStatus.CANCELLED: []
     }
 
+    old_status = order.status
+    status_changed = False
+
     if update_data.status:
         valid_statuses = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.CANCELLED]
         if update_data.status not in valid_statuses:
@@ -510,6 +522,7 @@ def update_order_admin(
                     )
 
             order.status = update_data.status
+            status_changed = True
             now = datetime.utcnow()
 
             if update_data.status == OrderStatus.CONFIRMED:
@@ -530,6 +543,22 @@ def update_order_admin(
 
     db.commit()
     db.refresh(order)
+
+    if status_changed:
+        send_order_status_message(
+            db=db,
+            order=order,
+            old_status=old_status,
+            new_status=order.status,
+            sender_id=current_user.id
+        )
+
+        if order.status == OrderStatus.DELIVERED:
+            send_delivery_reminder(
+                db=db,
+                order=order,
+                sender_id=current_user.id
+            )
 
     logger.info(f"管理员更新订单: 管理员 {current_user.username}, 订单号 {order.order_no}, 新状态 {order.status}")
     return _get_order_response(db, order)
@@ -558,6 +587,7 @@ def ship_order(
         )
 
     try:
+        old_status = order.status
         order.status = OrderStatus.SHIPPED
         order.tracking_company = ship_data.tracking_company
         order.tracking_number = ship_data.tracking_number
@@ -567,6 +597,14 @@ def ship_order(
 
         db.commit()
         db.refresh(order)
+
+        send_order_status_message(
+            db=db,
+            order=order,
+            old_status=old_status,
+            new_status=order.status,
+            sender_id=current_user.id
+        )
 
         logger.info(f"订单发货成功: 管理员 {current_user.username}, 订单号 {order.order_no}, 物流公司 {ship_data.tracking_company}, 单号 {ship_data.tracking_number}")
         return _get_order_response(db, order)

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { api } from '@/api'
 import type { User } from '@/types'
 import { useCartStore } from '@/stores/cart'
+import { useMessageStore } from '@/stores/message'
 
 export const useUserStore = defineStore('user', () => {
     const token = ref<string | null>(localStorage.getItem('token'))
@@ -19,6 +20,9 @@ export const useUserStore = defineStore('user', () => {
         
         const cartStore = useCartStore()
         await cartStore.onUserLogin()
+
+        const messageStore = useMessageStore()
+        messageStore.onUserLogin()
     }
 
     async function register(username: string, email: string, password: string) {
@@ -41,11 +45,16 @@ export const useUserStore = defineStore('user', () => {
         
         const cartStore = useCartStore()
         cartStore.onUserLogout()
+
+        const messageStore = useMessageStore()
+        messageStore.onUserLogout()
     }
 
     // 初始化时获取用户信息
     if (token.value) {
         fetchUser()
+        const messageStore = useMessageStore()
+        messageStore.fetchUnreadCount()
     }
 
     return {

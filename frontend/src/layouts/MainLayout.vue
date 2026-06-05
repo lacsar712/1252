@@ -32,6 +32,14 @@
         </nav>
         
         <div class="header-actions">
+          <template v-if="userStore.isLoggedIn">
+            <el-badge :value="messageStore.unreadCount.total_unread" :hidden="messageStore.unreadCount.total_unread === 0" class="message-badge">
+              <el-button text class="message-btn" @click="handleMessageClick">
+                <el-icon :size="22"><Bell /></el-icon>
+              </el-button>
+            </el-badge>
+          </template>
+          
           <el-badge :value="cartStore.cartCount" :hidden="cartStore.cartCount === 0" class="cart-badge">
             <el-button text class="cart-btn" @click="handleCartClick">
               <el-icon :size="22"><ShoppingCart /></el-icon>
@@ -52,6 +60,15 @@
                   <el-dropdown-item>
                     <el-icon><User /></el-icon>
                     {{ userStore.isAdmin ? '管理员' : '普通用户' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/messages')">
+                    <el-icon><Bell /></el-icon>
+                    消息中心
+                    <el-badge 
+                      v-if="messageStore.unreadCount.total_unread > 0" 
+                      :value="messageStore.unreadCount.total_unread" 
+                      class="inline-badge"
+                    />
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/coupons')">
                     <el-icon><Discount /></el-icon>
@@ -98,6 +115,7 @@ import { onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useCartStore } from '@/stores/cart'
+import { useMessageStore } from '@/stores/message'
 import { ElMessage } from 'element-plus'
 import {
   Reading,
@@ -109,21 +127,62 @@ import {
   User,
   SwitchButton,
   ShoppingCart,
-  Discount
+  Discount,
+  Bell
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const cartStore = useCartStore()
+const messageStore = useMessageStore()
 
 onMounted(async () => {
   await cartStore.fetchCartCount()
+  if (userStore.isLoggedIn) {
+    await messageStore.fetchUnreadCount()
+  }
 })
 
 watch(
   () => userStore.isLoggedIn,
   async () => {
     await cartStore.fetchCartCount()
+    if (userStore.isLoggedIn) {
+      await messageStore.fetchUnreadCount()
+    }
+  }
+)
+
+let messagePollingTimer: number | null = null
+
+function startMessagePolling() {
+  if (messagePollingTimer) return
+  messagePollingTimer = window.setInterval(async () => {
+    if (userStore.isLoggedIn) {
+      await messageStore.fetchUnreadCount()
+    }
+  }, 30000)
+}
+
+function stopMessagePolling() {
+  if (messagePollingTimer) {
+    clearInterval(messagePollingTimer)
+    messagePollingTimer = null
+  }
+}
+
+onMounted(() => {
+  startMessagePolling()
+})
+
+watch(
+  () => userStore.isLoggedIn,
+  (isLoggedIn) => {
+    if (isLoggedIn) {
+      startMessagePolling()
+    } else {
+      stopMessagePolling()
+    }
   }
 )
 
@@ -134,6 +193,15 @@ function handleCartClick() {
     return
   }
   router.push('/cart')
+}
+
+function handleMessageClick() {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后查看消息')
+    router.push({ name: 'Login', query: { redirect: '/messages' } })
+    return
+  }
+  router.push('/messages')
 }
 
 function handleLogout() {
@@ -220,6 +288,19 @@ function handleLogout() {
   gap: 12px;
 }
 
+.message-badge {
+  margin-right: 8px;
+}
+
+.message-btn {
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.message-btn:hover {
+  color: var(--primary-color);
+}
+
 .cart-badge {
   margin-right: 8px;
 }
@@ -231,6 +312,10 @@ function handleLogout() {
 
 .cart-btn:hover {
   color: var(--primary-color);
+}
+
+.inline-badge {
+  margin-left: 8px;
 }
 
 .user-info {

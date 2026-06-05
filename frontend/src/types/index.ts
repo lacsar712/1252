@@ -383,3 +383,62 @@ export interface CouponClaimResponse {
     message: string
     user_coupon: UserCoupon
 }
+
+export type MessageType = 'order_status' | 'delivery_reminder' | 'announcement' | 'account_security'
+export type MessageRecipientType = 'all_users' | 'specific_users'
+export type MessageStatusFilter = 'all' | 'unread' | 'read'
+
+export interface Message {
+    id: number
+    type: MessageType
+    title: string
+    content: string
+    sender_id: number | null
+    sender_name: string | null
+    recipient_type: MessageRecipientType
+    order_id: number | null
+    order_no: string | null
+    valid_from: string | null
+    valid_to: string | null
+    is_active: boolean
+    created_at: string
+    is_read: boolean
+    read_at: string | null
+    is_deleted: boolean
+}
+
+export interface MessageListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Message[]
+}
+
+export interface UnreadCountResponse {
+    total_unread: number
+    order_status_unread: number
+    delivery_reminder_unread: number
+    announcement_unread: number
+    account_security_unread: number
+}
+
+export interface AnnouncementCreate {
+    title: string
+    content: string
+    recipient_type: MessageRecipientType
+    user_ids?: number[]
+    valid_from?: string
+    valid_to?: string
+}
+
+export interface MessageBatchDeleteRequest {
+    message_ids: number[]
+}
+
+export interface MessageStatsResponse {
+    total_messages: number
+    active_messages: number
+    total_recipients: number
+    read_recipients: number
+    read_rate: number
+}

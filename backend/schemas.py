@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
-from models import CouponStatus, UserCouponStatus
+from models import CouponStatus, UserCouponStatus, MessageType, MessageRecipientType
 
 
 # ========== 作者相关 Schema ==========
@@ -428,3 +428,72 @@ class OrderCreateWithCoupon(OrderCreate):
 
 
 OrderResponse.model_rebuild()
+
+
+# ========== 消息相关 Schema ==========
+class MessageBase(BaseModel):
+    type: str = Field(..., description="消息类型")
+    title: str = Field(..., min_length=1, max_length=200, description="消息标题")
+    content: str = Field(..., min_length=1, description="消息正文")
+
+
+class MessageCreate(MessageBase):
+    recipient_type: str = Field(MessageRecipientType.SPECIFIC_USERS, description="接收者类型")
+    user_ids: Optional[List[int]] = Field(None, description="指定用户ID列表")
+    order_id: Optional[int] = Field(None, description="关联订单ID")
+    valid_from: Optional[datetime] = Field(None, description="有效期开始")
+    valid_to: Optional[datetime] = Field(None, description="有效期结束")
+
+
+class AnnouncementCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="公告标题")
+    content: str = Field(..., min_length=1, description="公告正文")
+    recipient_type: str = Field(MessageRecipientType.ALL_USERS, description="接收者类型")
+    user_ids: Optional[List[int]] = Field(None, description="指定用户ID列表（当recipient_type为specific_users时需要）")
+    valid_from: Optional[datetime] = Field(None, description="有效期开始")
+    valid_to: Optional[datetime] = Field(None, description="有效期结束")
+
+
+class MessageResponse(BaseModel):
+    id: int
+    type: str
+    title: str
+    content: str
+    sender_id: Optional[int]
+    sender_name: Optional[str] = None
+    recipient_type: str
+    order_id: Optional[int]
+    order_no: Optional[str] = None
+    valid_from: Optional[datetime]
+    valid_to: Optional[datetime]
+    is_active: bool
+    created_at: datetime
+    is_read: bool = False
+    read_at: Optional[datetime] = None
+    is_deleted: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class MessageListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[MessageResponse]
+
+
+class UnreadCountResponse(BaseModel):
+    total_unread: int = Field(0, description="总未读数量")
+    order_status_unread: int = Field(0, description="订单状态未读数量")
+    delivery_reminder_unread: int = Field(0, description="到货提醒未读数量")
+    announcement_unread: int = Field(0, description="公告未读数量")
+    account_security_unread: int = Field(0, description="账号安全未读数量")
+
+
+class MessageMarkReadRequest(BaseModel):
+    message_id: int = Field(..., description="消息ID")
+
+
+class MessageBatchDeleteRequest(BaseModel):
+    message_ids: List[int] = Field(..., description="消息ID列表")
