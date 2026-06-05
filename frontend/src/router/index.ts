@@ -29,6 +29,12 @@ const routes: RouteRecordRaw[] = [
                 name: 'Admin',
                 component: () => import('@/views/Admin.vue'),
                 meta: { title: '后台管理', requiresAdmin: true }
+            },
+            {
+                path: 'cart',
+                name: 'Cart',
+                component: () => import('@/views/Cart.vue'),
+                meta: { title: '购物车' }
             }
         ]
     },

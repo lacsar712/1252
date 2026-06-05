@@ -47,6 +47,38 @@
             </span>
           </div>
           
+          <div class="book-action-section" v-if="book">
+            <div class="quantity-section">
+              <span class="quantity-label">数量</span>
+              <el-input-number
+                v-model="quantity"
+                :min="1"
+                :max="book.stock"
+                size="large"
+                :disabled="book.stock === 0"
+              />
+            </div>
+            
+            <div class="action-buttons">
+              <el-button
+                type="primary"
+                size="large"
+                :disabled="book.stock === 0"
+                @click="handleAddToCart"
+              >
+                <el-icon><ShoppingCart /></el-icon>
+                加入购物车
+              </el-button>
+              <el-button
+                size="large"
+                :disabled="book.stock === 0"
+                @click="handleBuyNow"
+              >
+                立即购买
+              </el-button>
+            </div>
+          </div>
+          
         </div>
       </div>
       
@@ -61,17 +93,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
 import type { Book } from '@/types'
+import { useCartStore } from '@/stores/cart'
+import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
 import { ArrowLeft, User, OfficeBuilding, Document, ShoppingCart, Star } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
+const cartStore = useCartStore()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const book = ref<Book | null>(null)
+const quantity = ref(1)
 const defaultCover = 'https://via.placeholder.com/300x400/6366f1/ffffff?text=Book'
 
 onMounted(async () => {
@@ -91,9 +129,69 @@ onMounted(async () => {
   }
 })
 
+watch(
+  () => route.params.id,
+  async () => {
+    const bookId = Number(route.params.id)
+    if (bookId) {
+      quantity.value = 1
+      loading.value = true
+      try {
+        book.value = await api.getBook(bookId)
+      } catch (error) {
+        console.error('获取图书详情失败:', error)
+      } finally {
+        loading.value = false
+      }
+    }
+  }
+)
+
 function handleImageError(e: Event) {
   const img = e.target as HTMLImageElement
   img.src = defaultCover
+}
+
+async function handleAddToCart() {
+  if (!book.value) return
+  
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后加入购物车')
+    router.push({ name: 'Login', query: { redirect: `/books/${book.value.id}` } })
+    return
+  }
+  
+  if (book.value.stock <= 0) {
+    ElMessage.error('该图书已缺货')
+    return
+  }
+  
+  if (quantity.value > book.value.stock) {
+    ElMessage.warning(`库存不足，当前库存 ${book.value.stock} 本`)
+    return
+  }
+  
+  const success = await cartStore.addToCart(book.value.id, quantity.value)
+  if (success) {
+    await cartStore.fetchCartCount()
+  }
+}
+
+function handleBuyNow() {
+  if (!book.value) return
+  
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后购买')
+    router.push({ name: 'Login', query: { redirect: `/books/${book.value.id}` } })
+    return
+  }
+  
+  if (book.value.stock <= 0) {
+    ElMessage.error('该图书已缺货')
+    return
+  }
+  
+  ElMessage.info('购买功能开发中...')
 }
 </script>
 
@@ -194,6 +292,36 @@ function handleImageError(e: Event) {
 
 .stock-value.out-of-stock {
   color: var(--danger-color);
+}
+
+.book-action-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.quantity-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.quantity-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.action-buttons .el-button {
+  padding: 12px 32px;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .book-description {

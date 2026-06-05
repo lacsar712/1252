@@ -45,8 +45,8 @@
     <div class="book-list" v-loading="loading">
       <el-row :gutter="24">
         <el-col v-for="book in books" :key="book.id" :xs="12" :sm="8" :md="6" :lg="4">
-          <div class="book-card" @click="router.push(`/books/${book.id}`)">
-            <div class="book-cover">
+          <div class="book-card">
+            <div class="book-cover" @click="router.push(`/books/${book.id}`)">
               <img :src="book.cover_image || defaultCover" :alt="book.title" @error="handleImageError">
               <div class="book-overlay">
                 <el-button type="primary" circle>
@@ -55,14 +55,26 @@
               </div>
             </div>
             <div class="book-info">
-              <h4 class="book-title" :title="book.title">{{ book.title }}</h4>
-              <p class="book-author">{{ book.author }}</p>
-              <p class="book-publisher" v-if="book.publisher">{{ book.publisher }}</p>
+              <h4 class="book-title" :title="book.title" @click="router.push(`/books/${book.id}`)">{{ book.title }}</h4>
+              <p class="book-author" @click="router.push(`/books/${book.id}`)">{{ book.author }}</p>
+              <p class="book-publisher" v-if="book.publisher" @click="router.push(`/books/${book.id}`)">{{ book.publisher }}</p>
               <div class="book-meta">
                 <span class="book-price">¥{{ book.price.toFixed(2) }}</span>
                 <span class="book-stock" :class="{ 'out-of-stock': book.stock === 0 }">
                   {{ book.stock > 0 ? `库存: ${book.stock}` : '缺货' }}
                 </span>
+              </div>
+              <div class="book-actions">
+                <el-button
+                  type="primary"
+                  size="small"
+                  class="add-cart-btn"
+                  :disabled="book.stock === 0"
+                  @click.stop="handleAddToCart(book)"
+                >
+                  <el-icon><ShoppingCart /></el-icon>
+                  {{ book.stock === 0 ? '缺货' : '加入购物车' }}
+                </el-button>
               </div>
             </div>
           </div>
@@ -93,9 +105,14 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import type { Book } from '@/types'
-import { Search, View } from '@element-plus/icons-vue'
+import { useCartStore } from '@/stores/cart'
+import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
+import { Search, View, ShoppingCart } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const cartStore = useCartStore()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const books = ref<Book[]>([])
@@ -145,6 +162,24 @@ function handleSearch() {
 function handleImageError(e: Event) {
   const img = e.target as HTMLImageElement
   img.src = defaultCover
+}
+
+async function handleAddToCart(book: Book) {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后加入购物车')
+    router.push({ name: 'Login', query: { redirect: `/books/${book.id}` } })
+    return
+  }
+  
+  if (book.stock <= 0) {
+    ElMessage.error('该图书已缺货')
+    return
+  }
+  
+  const success = await cartStore.addToCart(book.id, 1)
+  if (success) {
+    await cartStore.fetchCartCount()
+  }
 }
 </script>
 
@@ -268,6 +303,7 @@ function handleImageError(e: Event) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 12px;
 }
 
 .book-price {
@@ -287,6 +323,14 @@ function handleImageError(e: Event) {
 .book-stock.out-of-stock {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger-color);
+}
+
+.book-actions {
+  margin-top: 8px;
+}
+
+.add-cart-btn {
+  width: 100%;
 }
 
 .pagination {

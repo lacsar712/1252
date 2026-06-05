@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -62,5 +62,36 @@ export const api = {
         instance.delete(`/books/${id}`),
 
     getCategories: (): Promise<string[]> =>
-        instance.get('/books/categories/list')
+        instance.get('/books/categories/list'),
+
+    // 购物车相关
+    getCart: (): Promise<CartListResponse> =>
+        instance.get('/cart'),
+
+    getCartCount: (): Promise<number> =>
+        instance.get('/cart/count'),
+
+    addToCart: (data: CartItemAdd): Promise<CartListResponse> =>
+        instance.post('/cart', data),
+
+    updateCartItemQuantity: (cartItemId: number, data: CartItemUpdate): Promise<CartListResponse> =>
+        instance.put(`/cart/${cartItemId}`, data),
+
+    updateCartItemSelected: (cartItemId: number, data: CartItemSelectedUpdate): Promise<CartListResponse> =>
+        instance.patch(`/cart/${cartItemId}/selected`, data),
+
+    updateAllCartItemsSelected: (data: CartItemSelectedUpdate): Promise<CartListResponse> =>
+        instance.patch('/cart/selected/all', data),
+
+    deleteCartItem: (cartItemId: number): Promise<CartListResponse> =>
+        instance.delete(`/cart/${cartItemId}`),
+
+    batchDeleteCartItems: (data: CartItemBatchDelete): Promise<CartListResponse> =>
+        instance.post('/cart/batch-delete', data),
+
+    clearInvalidItems: (): Promise<CartListResponse> =>
+        instance.delete('/cart/clear/invalid'),
+
+    clearCart: (): Promise<CartListResponse> =>
+        instance.delete('/cart')
 }

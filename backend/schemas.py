@@ -85,3 +85,45 @@ class BookListResponse(BaseModel):
     page: int
     page_size: int
     items: List[BookResponse]
+
+
+# ========== 购物车相关 Schema ==========
+class CartItemAdd(BaseModel):
+    book_id: int = Field(..., gt=0, description="图书ID")
+    quantity: int = Field(1, gt=0, description="数量")
+
+
+class CartItemUpdate(BaseModel):
+    quantity: int = Field(..., gt=0, description="数量")
+
+
+class CartItemSelectedUpdate(BaseModel):
+    selected: bool = Field(..., description="选中状态")
+
+
+class CartItemBatchDelete(BaseModel):
+    cart_item_ids: List[int] = Field(..., description="购物车项ID列表")
+
+
+class CartItemInfo(BaseModel):
+    id: int
+    user_id: int
+    book_id: int
+    quantity: int
+    selected: bool
+    created_at: datetime
+    updated_at: datetime
+    book: BookResponse
+
+    class Config:
+        from_attributes = True
+
+
+class CartListResponse(BaseModel):
+    items: List[CartItemInfo]
+    total_count: int
+    selected_count: int
+    total_price: float
+    selected_price: float
+    invalid_items: List[CartItemInfo]
+    low_stock_items: List[CartItemInfo]

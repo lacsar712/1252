@@ -45,3 +45,41 @@ export interface LoginResponse {
     access_token: string
     token_type: string
 }
+
+export interface CartItem {
+    id: number
+    user_id: number
+    book_id: number
+    quantity: number
+    selected: boolean
+    created_at: string
+    updated_at: string
+    book: Book
+}
+
+export interface CartListResponse {
+    items: CartItem[]
+    total_count: number
+    selected_count: number
+    total_price: number
+    selected_price: number
+    invalid_items: CartItem[]
+    low_stock_items: CartItem[]
+}
+
+export interface CartItemAdd {
+    book_id: number
+    quantity: number
+}
+
+export interface CartItemUpdate {
+    quantity: number
+}
+
+export interface CartItemSelectedUpdate {
+    selected: boolean
+}
+
+export interface CartItemBatchDelete {
+    cart_item_ids: number[]
+}

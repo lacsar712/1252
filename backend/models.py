@@ -39,3 +39,16 @@ class Book(Base):
     category = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CartItem(Base):
+    """购物车项模型"""
+    __tablename__ = "cart_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    selected = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

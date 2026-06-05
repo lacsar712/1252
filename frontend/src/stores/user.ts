@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api'
 import type { User } from '@/types'
+import { useCartStore } from '@/stores/cart'
 
 export const useUserStore = defineStore('user', () => {
     const token = ref<string | null>(localStorage.getItem('token'))
@@ -15,6 +16,9 @@ export const useUserStore = defineStore('user', () => {
         token.value = response.access_token
         localStorage.setItem('token', response.access_token)
         await fetchUser()
+        
+        const cartStore = useCartStore()
+        await cartStore.onUserLogin()
     }
 
     async function register(username: string, email: string, password: string) {
@@ -34,6 +38,9 @@ export const useUserStore = defineStore('user', () => {
         token.value = null
         user.value = null
         localStorage.removeItem('token')
+        
+        const cartStore = useCartStore()
+        cartStore.onUserLogout()
     }
 
     // 初始化时获取用户信息

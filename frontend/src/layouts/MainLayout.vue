@@ -24,6 +24,12 @@
         </nav>
         
         <div class="header-actions">
+          <el-badge :value="cartStore.cartCount" :hidden="cartStore.cartCount === 0" class="cart-badge">
+            <el-button text class="cart-btn" @click="handleCartClick">
+              <el-icon :size="22"><ShoppingCart /></el-icon>
+            </el-button>
+          </el-badge>
+          
           <template v-if="userStore.isLoggedIn">
             <el-dropdown trigger="click">
               <div class="user-info">
@@ -72,8 +78,10 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useCartStore } from '@/stores/cart'
 import { ElMessage } from 'element-plus'
 import {
   Reading,
@@ -82,11 +90,33 @@ import {
   Setting,
   ArrowDown,
   User,
-  SwitchButton
+  SwitchButton,
+  ShoppingCart
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const cartStore = useCartStore()
+
+onMounted(async () => {
+  await cartStore.fetchCartCount()
+})
+
+watch(
+  () => userStore.isLoggedIn,
+  async () => {
+    await cartStore.fetchCartCount()
+  }
+)
+
+function handleCartClick() {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后查看购物车')
+    router.push({ name: 'Login', query: { redirect: '/cart' } })
+    return
+  }
+  router.push('/cart')
+}
 
 function handleLogout() {
   userStore.logout()
@@ -170,6 +200,19 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.cart-badge {
+  margin-right: 8px;
+}
+
+.cart-btn {
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.cart-btn:hover {
+  color: var(--primary-color);
 }
 
 .user-info {
