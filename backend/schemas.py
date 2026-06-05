@@ -6,6 +6,8 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
+from models import CouponStatus, UserCouponStatus
+
 
 # ========== 用户相关 Schema ==========
 class UserBase(BaseModel):
@@ -174,6 +176,9 @@ class OrderResponse(BaseModel):
     order_no: str
     user_id: int
     total_amount: float
+    original_amount: float
+    discount_amount: float
+    user_coupon_id: Optional[int] = None
     status: str
     receiver_name: str
     receiver_phone: str
@@ -189,6 +194,7 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[OrderItemSnapshot]
+    used_coupon: Optional[UserCouponResponse] = None
 
     class Config:
         from_attributes = True
@@ -199,3 +205,92 @@ class OrderListResponse(BaseModel):
     page: int
     page_size: int
     items: List[OrderResponse]
+
+
+# ========== 优惠券相关 Schema ==========
+class CouponBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="优惠券名称")
+    description: Optional[str] = Field(None, max_length=500, description="优惠券说明")
+    threshold_amount: float = Field(..., ge=0, description="门槛金额")
+    discount_amount: float = Field(..., gt=0, description="优惠金额")
+    valid_from: datetime = Field(..., description="有效期开始")
+    valid_to: datetime = Field(..., description="有效期结束")
+    total_quantity: int = Field(..., ge=0, description="发放数量")
+    limit_per_user: int = Field(..., ge=1, description="每人限领次数")
+    applicable_categories: Optional[str] = Field(None, max_length=500, description="适用分类，多个用逗号分隔")
+    status: str = Field(CouponStatus.ACTIVE, description="启用状态")
+
+
+class CouponCreate(CouponBase):
+    pass
+
+
+class CouponUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="优惠券名称")
+    description: Optional[str] = Field(None, max_length=500, description="优惠券说明")
+    threshold_amount: Optional[float] = Field(None, ge=0, description="门槛金额")
+    discount_amount: Optional[float] = Field(None, gt=0, description="优惠金额")
+    valid_from: Optional[datetime] = Field(None, description="有效期开始")
+    valid_to: Optional[datetime] = Field(None, description="有效期结束")
+    total_quantity: Optional[int] = Field(None, ge=0, description="发放数量")
+    limit_per_user: Optional[int] = Field(None, ge=1, description="每人限领次数")
+    applicable_categories: Optional[str] = Field(None, max_length=500, description="适用分类")
+    status: Optional[str] = Field(None, description="启用状态")
+
+
+class CouponResponse(CouponBase):
+    id: int
+    claimed_quantity: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CouponListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[CouponResponse]
+
+
+class UserCouponResponse(BaseModel):
+    id: int
+    coupon_id: int
+    user_id: int
+    status: str
+    order_id: Optional[int]
+    used_at: Optional[datetime]
+    claimed_at: datetime
+    coupon: CouponResponse
+    unavailable_reason: Optional[str] = None
+    is_available: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class UserCouponListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[UserCouponResponse]
+
+
+class CouponClaimResponse(BaseModel):
+    message: str
+    user_coupon: UserCouponResponse
+
+
+class OrderCouponValidateRequest(BaseModel):
+    cart_item_ids: List[int] = Field(..., description="购物车项ID列表")
+
+
+class AvailableCouponResponse(BaseModel):
+    available: List[UserCouponResponse]
+    unavailable: List[UserCouponResponse]
+
+
+class OrderCreateWithCoupon(OrderCreate):
+    user_coupon_id: Optional[int] = Field(None, description="用户优惠券ID")

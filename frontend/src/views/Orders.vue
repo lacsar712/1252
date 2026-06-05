@@ -71,8 +71,20 @@
 
           <div class="order-footer">
             <div class="order-total">
-              共 {{ order.items.length }} 件商品，实付：
-              <span class="total-amount">¥{{ order.total_amount.toFixed(2) }}</span>
+              <div v-if="order.discount_amount > 0" class="order-discount">
+                已优惠 ¥{{ order.discount_amount.toFixed(2) }}
+                <el-tag size="small" type="warning" class="coupon-tag">
+                  {{ order.used_coupon?.coupon.name }}
+                </el-tag>
+              </div>
+              <div class="order-total-main">
+                共 {{ order.items.length }} 件商品，
+                <span v-if="order.discount_amount > 0" class="original-price">
+                  原价 ¥{{ order.original_amount.toFixed(2) }}
+                </span>
+                实付：
+                <span class="total-amount">¥{{ order.total_amount.toFixed(2) }}</span>
+              </div>
             </div>
             <div class="order-actions">
               <el-button
@@ -395,6 +407,32 @@ async function handleCancelOrder(order: Order) {
 .order-total {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.order-discount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--danger-color);
+  font-weight: 500;
+}
+
+.coupon-tag {
+  margin-left: 4px;
+}
+
+.order-total-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.original-price {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  margin-right: 4px;
 }
 
 .total-amount {

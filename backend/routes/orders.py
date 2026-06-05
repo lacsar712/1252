@@ -10,7 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Order, OrderItem, CartItem, Book, User, OrderStatus
+from models import (
+    Order, OrderItem, CartItem, Book, User, OrderStatus,
+    UserCoupon, UserCouponStatus, Coupon, CouponStatus
+)
 from schemas import (
     OrderResponse,
     OrderListResponse,
@@ -18,7 +21,10 @@ from schemas import (
     OrderCancel,
     OrderShip,
     OrderAdminUpdate,
-    OrderItemSnapshot
+    OrderItemSnapshot,
+    OrderCreateWithCoupon,
+    UserCouponResponse,
+    CouponResponse
 )
 from auth import get_current_active_user, get_current_admin_user
 
@@ -53,11 +59,30 @@ def _get_order_items_snapshot(db: Session, order_id: int) -> List[OrderItemSnaps
 def _get_order_response(db: Session, order: Order) -> OrderResponse:
     """获取订单响应对象"""
     items = _get_order_items_snapshot(db, order.id)
+
+    used_coupon = None
+    if order.user_coupon_id:
+        user_coupon = db.query(UserCoupon).filter(UserCoupon.id == order.user_coupon_id).first()
+        if user_coupon:
+            used_coupon = UserCouponResponse(
+                id=user_coupon.id,
+                coupon_id=user_coupon.coupon_id,
+                user_id=user_coupon.user_id,
+                status=user_coupon.status,
+                order_id=user_coupon.order_id,
+                used_at=user_coupon.used_at,
+                claimed_at=user_coupon.claimed_at,
+                coupon=CouponResponse.model_validate(user_coupon.coupon)
+            )
+
     return OrderResponse(
         id=order.id,
         order_no=order.order_no,
         user_id=order.user_id,
         total_amount=order.total_amount,
+        original_amount=order.original_amount,
+        discount_amount=order.discount_amount,
+        user_coupon_id=order.user_coupon_id,
         status=order.status,
         receiver_name=order.receiver_name,
         receiver_phone=order.receiver_phone,
@@ -72,18 +97,109 @@ def _get_order_response(db: Session, order: Order) -> OrderResponse:
         delivered_at=order.delivered_at,
         created_at=order.created_at,
         updated_at=order.updated_at,
-        items=items
+        items=items,
+        used_coupon=used_coupon
     )
+
+
+def _validate_and_calculate_coupon(
+    db: Session,
+    user_coupon_id: int,
+    current_user: User,
+    cart_items: List[CartItem],
+    total_amount: float
+) -> tuple[UserCoupon, float]:
+    """验证优惠券并计算优惠金额
+
+    Returns:
+        (user_coupon, discount_amount)
+    """
+    user_coupon = db.query(UserCoupon).filter(
+        UserCoupon.id == user_coupon_id,
+        UserCoupon.user_id == current_user.id
+    ).with_for_update().first()
+
+    if not user_coupon:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="优惠券不存在"
+        )
+
+    if user_coupon.status != UserCouponStatus.UNUSED:
+        if user_coupon.status == UserCouponStatus.USED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="优惠券已使用"
+            )
+        elif user_coupon.status == UserCouponStatus.EXPIRED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="优惠券已过期"
+            )
+        elif user_coupon.status == UserCouponStatus.LOCKED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="优惠券已被其他订单占用"
+            )
+
+    coupon = user_coupon.coupon
+
+    if coupon.status != CouponStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="优惠券已下架"
+        )
+
+    now = datetime.utcnow()
+    if now < coupon.valid_from:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="优惠券尚未生效"
+        )
+    if now > coupon.valid_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="优惠券已过期"
+        )
+
+    if total_amount < coupon.threshold_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"订单金额不足 ¥{coupon.threshold_amount:.2f}，无法使用该优惠券"
+        )
+
+    applicable_categories = []
+    if coupon.applicable_categories:
+        applicable_categories = [cat.strip() for cat in coupon.applicable_categories.split(",") if cat.strip()]
+
+    if applicable_categories:
+        book_categories = []
+        for cart_item in cart_items:
+            book = db.query(Book).filter(Book.id == cart_item.book_id).first()
+            if book and book.category and book.category not in book_categories:
+                book_categories.append(book.category)
+
+        if not any(cat in applicable_categories for cat in book_categories):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="订单中没有符合该优惠券适用分类的商品"
+            )
+
+    discount_amount = coupon.discount_amount
+    if discount_amount > total_amount:
+        discount_amount = total_amount
+
+    return user_coupon, discount_amount
 
 
 # ========== 用户端API ==========
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
-    order_create: OrderCreate,
+    order_create: OrderCreateWithCoupon,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """创建订单（从购物车勾选商品）"""
+    """创建订单（从购物车勾选商品，支持优惠券抵扣）"""
     try:
         if order_create.cart_item_ids:
             cart_items = db.query(CartItem).filter(
@@ -116,13 +232,32 @@ def create_order(
                     detail=f"图书《{book.title}》库存不足，当前库存 {book.stock} 本"
                 )
 
-        total_amount = 0.0
+        original_amount = 0.0
+        for cart_item in cart_items:
+            book = db.query(Book).filter(Book.id == cart_item.book_id).first()
+            original_amount += book.price * cart_item.quantity
+        original_amount = round(original_amount, 2)
+
+        discount_amount = 0.0
+        user_coupon = None
+        if order_create.user_coupon_id:
+            user_coupon, discount_amount = _validate_and_calculate_coupon(
+                db, order_create.user_coupon_id, current_user, cart_items, original_amount
+            )
+
+        total_amount = round(original_amount - discount_amount, 2)
+        if total_amount < 0:
+            total_amount = 0.0
+
         order_no = _generate_order_no()
 
         db_order = Order(
             order_no=order_no,
             user_id=current_user.id,
-            total_amount=0.0,
+            total_amount=total_amount,
+            original_amount=original_amount,
+            discount_amount=discount_amount,
+            user_coupon_id=order_create.user_coupon_id,
             status=OrderStatus.PENDING,
             receiver_name=order_create.receiver_name,
             receiver_phone=order_create.receiver_phone,
@@ -137,7 +272,6 @@ def create_order(
             book.stock -= cart_item.quantity
 
             subtotal = round(book.price * cart_item.quantity, 2)
-            total_amount += subtotal
 
             db_order_item = OrderItem(
                 order_id=db_order.id,
@@ -153,12 +287,18 @@ def create_order(
 
             db.delete(cart_item)
 
-        db_order.total_amount = round(total_amount, 2)
+        if user_coupon:
+            user_coupon.status = UserCouponStatus.USED
+            user_coupon.order_id = db_order.id
+            user_coupon.used_at = datetime.utcnow()
 
         db.commit()
         db.refresh(db_order)
 
-        logger.info(f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 金额 {total_amount:.2f}")
+        if discount_amount > 0:
+            logger.info(f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 原价 {original_amount:.2f}, 优惠 {discount_amount:.2f}, 实付 {total_amount:.2f}")
+        else:
+            logger.info(f"订单创建成功: 用户 {current_user.username}, 订单号 {order_no}, 金额 {total_amount:.2f}")
         return _get_order_response(db, db_order)
 
     except HTTPException:
@@ -259,6 +399,17 @@ def cancel_order(
             book = db.query(Book).filter(Book.id == item.book_id).with_for_update().first()
             if book:
                 book.stock += item.quantity
+
+        if order.user_coupon_id:
+            user_coupon = db.query(UserCoupon).filter(
+                UserCoupon.id == order.user_coupon_id,
+                UserCoupon.status == UserCouponStatus.USED
+            ).first()
+            if user_coupon:
+                user_coupon.status = UserCouponStatus.UNUSED
+                user_coupon.order_id = None
+                user_coupon.used_at = None
+                logger.info(f"优惠券已退回: 用户 {current_user.username}, 用户优惠券ID {user_coupon.id}")
 
         order.status = OrderStatus.CANCELLED
         order.cancel_reason = cancel_data.cancel_reason

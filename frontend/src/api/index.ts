@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCreate, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -90,9 +90,6 @@ export const api = {
     clearCart: (): Promise<CartListResponse> =>
         instance.delete('/cart'),
 
-    createOrder: (data: OrderCreate): Promise<Order> =>
-        instance.post('/orders', data),
-
     getMyOrders: (params?: { status?: OrderStatus; page?: number; page_size?: number }): Promise<OrderListResponse> =>
         instance.get('/orders/my', { params }),
 
@@ -109,5 +106,35 @@ export const api = {
         instance.get('/orders', { params }),
 
     updateOrderAdmin: (orderId: number, data: OrderAdminUpdate): Promise<Order> =>
-        instance.patch(`/orders/${orderId}/admin`, data)
+        instance.patch(`/orders/${orderId}/admin`, data),
+
+    createOrder: (data: OrderCreateWithCoupon): Promise<Order> =>
+        instance.post('/orders', data),
+
+    getAdminCoupons: (params?: { status?: string; page?: number; page_size?: number }): Promise<CouponListResponse> =>
+        instance.get('/coupons/admin', { params }),
+
+    getAdminCoupon: (couponId: number): Promise<Coupon> =>
+        instance.get(`/coupons/admin/${couponId}`),
+
+    createCoupon: (coupon: CouponCreate): Promise<Coupon> =>
+        instance.post('/coupons', coupon),
+
+    updateCoupon: (couponId: number, coupon: CouponUpdate): Promise<Coupon> =>
+        instance.put(`/coupons/${couponId}`, coupon),
+
+    deleteCoupon: (couponId: number): Promise<void> =>
+        instance.delete(`/coupons/${couponId}`),
+
+    getAvailableCoupons: (params?: { page?: number; page_size?: number }): Promise<CouponListResponse> =>
+        instance.get('/coupons/available', { params }),
+
+    claimCoupon: (couponId: number): Promise<CouponClaimResponse> =>
+        instance.post(`/coupons/${couponId}/claim`),
+
+    getMyCoupons: (params?: { status?: string; page?: number; page_size?: number }): Promise<UserCouponListResponse> =>
+        instance.get('/coupons/my', { params }),
+
+    validateCouponsForOrder: (cartItemIds: number[]): Promise<AvailableCouponResponse> =>
+        instance.post('/coupons/validate-for-order', { cart_item_ids: cartItemIds })
 }

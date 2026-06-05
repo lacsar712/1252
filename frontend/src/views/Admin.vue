@@ -206,6 +206,110 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="优惠券管理" name="coupons">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>优惠券管理</h1>
+            <el-button type="primary" @click="handleAddCoupon">
+              <el-icon><Plus /></el-icon>
+              添加优惠券
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-select
+              v-model="couponStatusFilter"
+              placeholder="优惠券状态"
+              clearable
+              style="width: 150px"
+              @change="fetchCoupons"
+            >
+              <el-option label="启用中" value="active" />
+              <el-option label="已停用" value="inactive" />
+              <el-option label="已过期" value="expired" />
+              <el-option label="已领完" value="sold_out" />
+            </el-select>
+            <el-button @click="fetchCoupons">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="coupons"
+            v-loading="couponsLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="name" label="优惠券名称" min-width="150" />
+            <el-table-column label="优惠规则" width="180">
+              <template #default="{ row }">
+                <span class="coupon-rule">
+                  满¥{{ row.threshold_amount.toFixed(2) }}减¥{{ row.discount_amount.toFixed(2) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="有效期" width="280">
+              <template #default="{ row }">
+                <div class="valid-period">
+                  <div>{{ formatDate(row.valid_from) }}</div>
+                  <div class="arrow">→</div>
+                  <div>{{ formatDate(row.valid_to) }}</div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="发放/已领" width="120">
+              <template #default="{ row }">
+                <span>{{ row.claimed_quantity }}/{{ row.total_quantity }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="每人限领" width="100">
+              <template #default="{ row }">
+                <span>{{ row.limit_per_user }}张</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="applicable_categories" label="适用分类" width="120">
+              <template #default="{ row }">
+                <el-tag v-if="row.applicable_categories" size="small" type="info">
+                  {{ row.applicable_categories }}
+                </el-tag>
+                <span v-else>全品类</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getCouponStatusType(row.status)" size="small">
+                  {{ getCouponStatusText(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEditCoupon(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  title="确定要删除此优惠券吗？"
+                  @confirm="handleDeleteCoupon(row.id)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="couponsCurrentPage"
+              v-model:page-size="couponsPageSize"
+              :total="couponsTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchCoupons"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
     
     <el-dialog
@@ -297,6 +401,136 @@
     </el-dialog>
 
     <el-dialog
+      v-model="couponDialogVisible"
+      :title="isCouponEdit ? '编辑优惠券' : '添加优惠券'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="couponFormRef"
+        :model="couponForm"
+        :rules="couponRules"
+        label-width="100px"
+      >
+        <el-form-item label="优惠券名称" prop="name">
+          <el-input v-model="couponForm.name" placeholder="请输入优惠券名称" maxlength="100" show-word-limit />
+        </el-form-item>
+
+        <el-form-item label="优惠券说明" prop="description">
+          <el-input
+            v-model="couponForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入优惠券说明（可选）"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="门槛金额" prop="threshold_amount">
+              <el-input-number
+                v-model="couponForm.threshold_amount"
+                :min="0"
+                :precision="2"
+                :step="10"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">订单满此金额可使用</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="优惠金额" prop="discount_amount">
+              <el-input-number
+                v-model="couponForm.discount_amount"
+                :min="0.01"
+                :precision="2"
+                :step="5"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">不能大于门槛金额</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="有效期开始" prop="valid_from">
+              <el-date-picker
+                v-model="couponForm.valid_from"
+                type="datetime"
+                placeholder="选择开始时间"
+                style="width: 100%"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="有效期结束" prop="valid_to">
+              <el-date-picker
+                v-model="couponForm.valid_to"
+                type="datetime"
+                placeholder="选择结束时间"
+                style="width: 100%"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="发放数量" prop="total_quantity">
+              <el-input-number
+                v-model="couponForm.total_quantity"
+                :min="1"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="每人限领" prop="limit_per_user">
+              <el-input-number
+                v-model="couponForm.limit_per_user"
+                :min="1"
+                :max="10"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <span class="form-tip">每人最多领取张数</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="适用分类" prop="applicable_categories">
+          <el-input
+            v-model="couponForm.applicable_categories"
+            placeholder="请输入适用分类，多个分类用逗号分隔（留空表示全品类）"
+          />
+          <span class="form-tip">例如：小说,科技,教育</span>
+        </el-form-item>
+
+        <el-form-item label="启用状态" prop="status">
+          <el-radio-group v-model="couponForm.status">
+            <el-radio value="active">启用</el-radio>
+            <el-radio value="inactive">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="couponDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="couponSubmitting" @click="handleCouponSubmit">
+          {{ isCouponEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="orderDetailVisible"
       title="订单详情"
       width="800px"
@@ -315,7 +549,22 @@
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="订单金额">
-              <span class="price">¥{{ currentOrder.total_amount.toFixed(2) }}</span>
+              <div class="order-amount-info">
+                <div v-if="currentOrder.discount_amount > 0" class="original-amount">
+                  原价：<span class="line-through">¥{{ currentOrder.original_amount.toFixed(2) }}</span>
+                </div>
+                <div v-if="currentOrder.discount_amount > 0" class="discount-amount">
+                  优惠：<span class="discount">-¥{{ currentOrder.discount_amount.toFixed(2) }}</span>
+                </div>
+                <div class="final-amount">
+                  实付：<span class="price">¥{{ currentOrder.total_amount.toFixed(2) }}</span>
+                </div>
+              </div>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="currentOrder.used_coupon" label="使用优惠券">
+              <el-tag type="warning" size="small">
+                {{ currentOrder.used_coupon.coupon.name }}
+              </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="下单时间">
               {{ formatDate(currentOrder.created_at) }}
@@ -469,7 +718,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 
@@ -522,6 +771,41 @@ const remarkForm = reactive({
   admin_remark: ''
 })
 
+const couponsLoading = ref(false)
+const coupons = ref<Coupon[]>([])
+const couponsTotal = ref(0)
+const couponsCurrentPage = ref(1)
+const couponsPageSize = ref(10)
+const couponStatusFilter = ref<CouponStatusType | ''>('')
+const couponDialogVisible = ref(false)
+const isCouponEdit = ref(false)
+const couponEditingId = ref<number | null>(null)
+const couponSubmitting = ref(false)
+const couponFormRef = ref<FormInstance>()
+
+const couponForm = reactive<CouponCreate>({
+  name: '',
+  description: '',
+  threshold_amount: 0,
+  discount_amount: 0,
+  valid_from: '',
+  valid_to: '',
+  total_quantity: 100,
+  limit_per_user: 1,
+  applicable_categories: '',
+  status: 'active'
+})
+
+const couponRules: FormRules = {
+  name: [{ required: true, message: '请输入优惠券名称', trigger: 'blur' }],
+  threshold_amount: [{ required: true, message: '请输入门槛金额', trigger: 'blur' }],
+  discount_amount: [{ required: true, message: '请输入优惠金额', trigger: 'blur' }],
+  valid_from: [{ required: true, message: '请选择有效期开始时间', trigger: 'change' }],
+  valid_to: [{ required: true, message: '请选择有效期结束时间', trigger: 'change' }],
+  total_quantity: [{ required: true, message: '请输入发放数量', trigger: 'blur' }],
+  limit_per_user: [{ required: true, message: '请输入每人限领次数', trigger: 'blur' }]
+}
+
 const bookForm = reactive<BookCreate>({
   title: '',
   author: '',
@@ -547,6 +831,9 @@ onMounted(() => {
 watch(activeTab, (newTab) => {
   if (newTab === 'orders' && orders.value.length === 0) {
     fetchOrders()
+  }
+  if (newTab === 'coupons' && coupons.value.length === 0) {
+    fetchCoupons()
   }
 })
 
@@ -770,6 +1057,119 @@ async function handleRemarkSubmit() {
     remarkSubmitting.value = false
   }
 }
+
+async function fetchCoupons() {
+  couponsLoading.value = true
+  try {
+    const response = await api.getAdminCoupons({
+      status: couponStatusFilter.value || undefined,
+      page: couponsCurrentPage.value,
+      page_size: couponsPageSize.value
+    })
+    coupons.value = response.items
+    couponsTotal.value = response.total
+  } catch (error) {
+    console.error('获取优惠券列表失败:', error)
+  } finally {
+    couponsLoading.value = false
+  }
+}
+
+function handleAddCoupon() {
+  isCouponEdit.value = false
+  couponEditingId.value = null
+  resetCouponForm()
+  couponDialogVisible.value = true
+}
+
+function handleEditCoupon(coupon: Coupon) {
+  isCouponEdit.value = true
+  couponEditingId.value = coupon.id
+  Object.assign(couponForm, {
+    name: coupon.name,
+    description: coupon.description || '',
+    threshold_amount: coupon.threshold_amount,
+    discount_amount: coupon.discount_amount,
+    valid_from: coupon.valid_from,
+    valid_to: coupon.valid_to,
+    total_quantity: coupon.total_quantity,
+    limit_per_user: coupon.limit_per_user,
+    applicable_categories: coupon.applicable_categories || '',
+    status: coupon.status
+  })
+  couponDialogVisible.value = true
+}
+
+async function handleDeleteCoupon(id: number) {
+  try {
+    await api.deleteCoupon(id)
+    ElMessage.success('删除成功')
+    fetchCoupons()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function handleCouponSubmit() {
+  if (!couponFormRef.value) return
+  
+  await couponFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    couponSubmitting.value = true
+    try {
+      if (isCouponEdit.value && couponEditingId.value) {
+        const updateData: CouponUpdate = { ...couponForm }
+        await api.updateCoupon(couponEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createCoupon(couponForm)
+        ElMessage.success('添加成功')
+      }
+      couponDialogVisible.value = false
+      fetchCoupons()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      couponSubmitting.value = false
+    }
+  })
+}
+
+function resetCouponForm() {
+  Object.assign(couponForm, {
+    name: '',
+    description: '',
+    threshold_amount: 0,
+    discount_amount: 0,
+    valid_from: '',
+    valid_to: '',
+    total_quantity: 100,
+    limit_per_user: 1,
+    applicable_categories: '',
+    status: 'active'
+  })
+}
+
+function getCouponStatusType(status: CouponStatusType): string {
+  const map: Record<CouponStatusType, string> = {
+    active: 'success',
+    inactive: 'info',
+    expired: 'danger',
+    sold_out: 'warning'
+  }
+  return map[status] || 'info'
+}
+
+function getCouponStatusText(status: CouponStatusType): string {
+  const map: Record<CouponStatusType, string> = {
+    active: '启用中',
+    inactive: '已停用',
+    expired: '已过期',
+    sold_out: '已领完'
+  }
+  return map[status] || status
+}
 </script>
 
 <style scoped>
@@ -872,5 +1272,57 @@ async function handleRemarkSubmit() {
 .order-item-author {
   font-size: 12px;
   color: #909399;
+}
+
+.coupon-rule {
+  font-weight: 600;
+  color: var(--danger-color);
+}
+
+.valid-period {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.valid-period .arrow {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.form-tip {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.order-amount-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.original-amount {
+  font-size: 12px;
+}
+
+.line-through {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.discount-amount {
+  font-size: 12px;
+}
+
+.discount {
+  color: var(--danger-color);
+  font-weight: 600;
+}
+
+.final-amount {
+  font-size: 14px;
 }
 </style>

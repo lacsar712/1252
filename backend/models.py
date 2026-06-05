@@ -72,6 +72,9 @@ class Order(Base):
     order_no = Column(String(50), unique=True, index=True, nullable=False)
     user_id = Column(Integer, nullable=False, index=True)
     total_amount = Column(Float, nullable=False)
+    original_amount = Column(Float, nullable=False, default=0.0)
+    discount_amount = Column(Float, nullable=False, default=0.0)
+    user_coupon_id = Column(Integer, nullable=True, index=True)
     status = Column(String(20), default=OrderStatus.PENDING, nullable=False)
     receiver_name = Column(String(50), nullable=False)
     receiver_phone = Column(String(20), nullable=False)
@@ -106,3 +109,59 @@ class OrderItem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order = relationship("Order", back_populates="items")
+
+
+class CouponStatus:
+    """优惠券状态枚举"""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    EXPIRED = "expired"
+    SOLD_OUT = "sold_out"
+
+
+class UserCouponStatus:
+    """用户优惠券状态枚举"""
+    UNUSED = "unused"
+    USED = "used"
+    EXPIRED = "expired"
+    LOCKED = "locked"
+
+
+class Coupon(Base):
+    """优惠券模板模型"""
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(String(500), nullable=True)
+    threshold_amount = Column(Float, nullable=False, default=0.0)
+    discount_amount = Column(Float, nullable=False)
+    valid_from = Column(DateTime, nullable=False)
+    valid_to = Column(DateTime, nullable=False)
+    total_quantity = Column(Integer, nullable=False, default=0)
+    claimed_quantity = Column(Integer, nullable=False, default=0)
+    limit_per_user = Column(Integer, nullable=False, default=1)
+    applicable_categories = Column(String(500), nullable=True)
+    status = Column(String(20), default=CouponStatus.ACTIVE, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user_coupons = relationship("UserCoupon", back_populates="coupon", cascade="all, delete-orphan")
+
+
+class UserCoupon(Base):
+    """用户优惠券模型"""
+    __tablename__ = "user_coupons"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=False, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    status = Column(String(20), default=UserCouponStatus.UNUSED, nullable=False)
+    order_id = Column(Integer, nullable=True, index=True)
+    used_at = Column(DateTime, nullable=True)
+    locked_at = Column(DateTime, nullable=True)
+    locked_order_id = Column(Integer, nullable=True)
+    claimed_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    coupon = relationship("Coupon", back_populates="user_coupons")

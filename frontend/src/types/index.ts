@@ -101,6 +101,9 @@ export interface Order {
     order_no: string
     user_id: number
     total_amount: number
+    original_amount: number
+    discount_amount: number
+    user_coupon_id: number | null
     status: OrderStatus
     receiver_name: string
     receiver_phone: string
@@ -116,6 +119,7 @@ export interface Order {
     created_at: string
     updated_at: string
     items: OrderItemSnapshot[]
+    used_coupon: UserCoupon | null
 }
 
 export interface OrderListResponse {
@@ -148,4 +152,91 @@ export interface OrderAdminUpdate {
     admin_remark?: string
     tracking_company?: string
     tracking_number?: string
+}
+
+export type CouponStatus = 'active' | 'inactive' | 'expired' | 'sold_out'
+export type UserCouponStatus = 'unused' | 'used' | 'expired' | 'locked'
+
+export interface Coupon {
+    id: number
+    name: string
+    description: string | null
+    threshold_amount: number
+    discount_amount: number
+    valid_from: string
+    valid_to: string
+    total_quantity: number
+    claimed_quantity: number
+    limit_per_user: number
+    applicable_categories: string | null
+    status: CouponStatus
+    created_at: string
+    updated_at: string
+}
+
+export interface CouponListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Coupon[]
+}
+
+export interface CouponCreate {
+    name: string
+    description?: string
+    threshold_amount: number
+    discount_amount: number
+    valid_from: string
+    valid_to: string
+    total_quantity: number
+    limit_per_user: number
+    applicable_categories?: string
+    status: CouponStatus
+}
+
+export interface CouponUpdate {
+    name?: string
+    description?: string
+    threshold_amount?: number
+    discount_amount?: number
+    valid_from?: string
+    valid_to?: string
+    total_quantity?: number
+    limit_per_user?: number
+    applicable_categories?: string
+    status?: CouponStatus
+}
+
+export interface UserCoupon {
+    id: number
+    coupon_id: number
+    user_id: number
+    status: UserCouponStatus
+    order_id: number | null
+    used_at: string | null
+    claimed_at: string
+    coupon: Coupon
+    unavailable_reason?: string
+    is_available?: boolean
+}
+
+export interface UserCouponListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: UserCoupon[]
+}
+
+export interface AvailableCouponResponse {
+    available: UserCoupon[]
+    unavailable: UserCoupon[]
+}
+
+export interface OrderCreateWithCoupon extends OrderCreate {
+    user_coupon_id?: number
+}
+
+export interface CouponClaimResponse {
+    message: string
+    user_coupon: UserCoupon
 }

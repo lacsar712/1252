@@ -144,6 +144,25 @@
         </el-table>
       </el-card>
 
+      <el-card
+        v-if="order.used_coupon"
+        class="info-card coupon-card"
+      >
+        <template #header>
+          <span class="card-title">使用优惠券</span>
+        </template>
+        <div class="coupon-used-info">
+          <div class="coupon-used-badge">
+            <span class="coupon-used-amount">-¥{{ order.used_coupon.coupon.discount_amount }}</span>
+            <span class="coupon-used-threshold">满{{ order.used_coupon.coupon.threshold_amount }}可用</span>
+          </div>
+          <div class="coupon-used-details">
+            <div class="coupon-used-name">{{ order.used_coupon.coupon.name }}</div>
+            <div class="coupon-used-time">使用时间：{{ formatDate(order.used_coupon.used_at!) }}</div>
+          </div>
+        </div>
+      </el-card>
+
       <el-card class="summary-card">
         <template #header>
           <span class="card-title">订单汇总</span>
@@ -151,7 +170,11 @@
         <div class="summary-content">
           <div class="summary-row">
             <span>商品总价：</span>
-            <span>¥{{ order.total_amount.toFixed(2) }}</span>
+            <span>¥{{ order.original_amount.toFixed(2) }}</span>
+          </div>
+          <div v-if="order.discount_amount > 0" class="summary-row discount-row">
+            <span>优惠券抵扣：</span>
+            <span class="discount-amount">-¥{{ order.discount_amount.toFixed(2) }}</span>
           </div>
           <div class="summary-row">
             <span>运费：</span>
@@ -456,6 +479,73 @@ async function handleCancelOrder() {
 
 .free-shipping {
   color: var(--success-color);
+}
+
+.discount-row {
+  color: var(--danger-color);
+}
+
+.discount-amount {
+  color: var(--danger-color);
+  font-weight: 600;
+}
+
+.coupon-used-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: #fff;
+}
+
+.coupon-used-badge {
+  text-align: center;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.coupon-used-amount {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.coupon-used-threshold {
+  display: block;
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.coupon-used-details {
+  flex: 1;
+}
+
+.coupon-used-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.coupon-used-time {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.coupon-card {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.coupon-card :deep(.el-card__header) {
+  padding: 0 0 16px 0;
+  border-bottom: none;
 }
 
 .summary-total {

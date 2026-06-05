@@ -17,6 +17,10 @@
             <el-icon><Collection /></el-icon>
             <span>图书列表</span>
           </router-link>
+          <router-link v-if="userStore.isLoggedIn" to="/coupons" class="nav-link" active-class="active">
+            <el-icon><Discount /></el-icon>
+            <span>领券中心</span>
+          </router-link>
           <router-link v-if="userStore.isLoggedIn" to="/orders" class="nav-link" active-class="active">
             <el-icon><List /></el-icon>
             <span>我的订单</span>
@@ -48,6 +52,10 @@
                   <el-dropdown-item>
                     <el-icon><User /></el-icon>
                     {{ userStore.isAdmin ? '管理员' : '普通用户' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/coupons')">
+                    <el-icon><Discount /></el-icon>
+                    领券中心
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/orders')">
                     <el-icon><List /></el-icon>
@@ -100,7 +108,8 @@ import {
   ArrowDown,
   User,
   SwitchButton,
-  ShoppingCart
+  ShoppingCart,
+  Discount
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

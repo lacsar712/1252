@@ -115,11 +115,42 @@
             <span>运费：</span>
             <span class="free-shipping">免运费</span>
           </div>
+
+          <div class="coupon-section">
+            <div class="coupon-header">
+              <span class="coupon-title">优惠券</span>
+              <el-button type="primary" link @click="openCouponDialog" :disabled="selectedItems.length === 0">
+                <template v-if="selectedCoupon">
+                  已选：¥{{ selectedCoupon.coupon.discount_amount }}
+                </template>
+                <template v-else-if="availableCoupons.length > 0">
+                  {{ availableCoupons.length }}张可用
+                </template>
+                <template v-else>
+                  暂无可用
+                </template>
+              </el-button>
+            </div>
+            <div v-if="selectedCoupon" class="selected-coupon-info">
+              <div class="coupon-badge">
+                <span class="coupon-badge-amount">-¥{{ selectedCoupon.coupon.discount_amount }}</span>
+              </div>
+              <div class="coupon-badge-info">
+                <div class="coupon-badge-name">{{ selectedCoupon.coupon.name }}</div>
+                <div class="coupon-badge-desc">满{{ selectedCoupon.coupon.threshold_amount }}可用</div>
+              </div>
+              <el-button link type="danger" @click="clearCoupon">不使用</el-button>
+            </div>
+          </div>
+
           <el-divider />
           <div class="summary-footer">
             <div class="footer-total">
               <span>应付金额：</span>
-              <span class="footer-price">¥{{ cartStore.selectedPrice.toFixed(2) }}</span>
+              <span class="footer-price">¥{{ finalPrice.toFixed(2) }}</span>
+            </div>
+            <div v-if="selectedCoupon" class="discount-info">
+              已优惠 ¥{{ discountAmount.toFixed(2) }}
             </div>
             <el-button
               type="primary"
@@ -140,6 +171,74 @@
           </div>
         </div>
       </div>
+
+      <el-dialog
+        v-model="couponDialogVisible"
+        title="选择优惠券"
+        width="600px"
+        destroy-on-close
+        @open="loadCoupons"
+      >
+        <div class="coupon-select-list">
+          <div class="coupon-list-section">
+            <div class="section-title">
+              <span>可用优惠券 ({{ availableCoupons.length }})</span>
+            </div>
+            <div
+              v-for="coupon in availableCoupons"
+              :key="coupon.id"
+              :class="['coupon-select-item', { 'selected': selectedCoupon?.id === coupon.id }]"
+              @click="selectCoupon(coupon)"
+            >
+              <div class="coupon-select-left">
+                <span class="coupon-select-amount">¥{{ coupon.coupon.discount_amount }}</span>
+                <span class="coupon-select-threshold">满{{ coupon.coupon.threshold_amount }}可用</span>
+              </div>
+              <div class="coupon-select-right">
+                <div class="coupon-select-name">{{ coupon.coupon.name }}</div>
+                <div class="coupon-select-valid">
+                  有效期：{{ formatDate(coupon.coupon.valid_from) }} - {{ formatDate(coupon.coupon.valid_to) }}
+                </div>
+                <div v-if="coupon.coupon.applicable_categories" class="coupon-select-cats">
+                  适用：{{ coupon.coupon.applicable_categories }}
+                </div>
+              </div>
+              <el-radio :model-value="selectedCoupon?.id === coupon.id" class="coupon-select-radio" />
+            </div>
+            <el-empty v-if="availableCoupons.length === 0" description="暂无可用优惠券" :image-size="80" />
+          </div>
+
+          <div v-if="unavailableCoupons.length > 0" class="coupon-list-section">
+            <div class="section-title">
+              <span>不可用优惠券 ({{ unavailableCoupons.length }})</span>
+            </div>
+            <div
+              v-for="coupon in unavailableCoupons"
+              :key="coupon.id"
+              class="coupon-select-item unavailable"
+            >
+              <div class="coupon-select-left">
+                <span class="coupon-select-amount">¥{{ coupon.coupon.discount_amount }}</span>
+                <span class="coupon-select-threshold">满{{ coupon.coupon.threshold_amount }}可用</span>
+              </div>
+              <div class="coupon-select-right">
+                <div class="coupon-select-name">{{ coupon.coupon.name }}</div>
+                <div class="coupon-select-valid">
+                  有效期：{{ formatDate(coupon.coupon.valid_from) }} - {{ formatDate(coupon.coupon.valid_to) }}
+                </div>
+                <div class="unavailable-reason">
+                  <el-tag size="small" type="info">{{ coupon.unavailable_reason }}</el-tag>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <el-button @click="couponDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmCouponSelection">确定</el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -150,6 +249,7 @@ import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { api } from '@/api'
+import type { UserCoupon, OrderCreateWithCoupon } from '@/types'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 
 const router = useRouter()
@@ -160,6 +260,22 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const submitting = ref(false)
 const defaultCover = 'https://via.placeholder.com/120x160/6366f1/ffffff?text=Book'
+
+const couponDialogVisible = ref(false)
+const couponsLoading = ref(false)
+const availableCoupons = ref<UserCoupon[]>([])
+const unavailableCoupons = ref<UserCoupon[]>([])
+const selectedCoupon = ref<UserCoupon | null>(null)
+const tempSelectedCoupon = ref<UserCoupon | null>(null)
+
+const discountAmount = computed(() => {
+  return selectedCoupon.value ? selectedCoupon.value.coupon.discount_amount : 0
+})
+
+const finalPrice = computed(() => {
+  const price = cartStore.selectedPrice - discountAmount.value
+  return price > 0 ? price : 0
+})
 
 const formData = ref({
   receiver_name: '',
@@ -214,6 +330,49 @@ function handleImageError(e: Event) {
   img.src = defaultCover
 }
 
+async function loadCoupons() {
+  if (selectedItems.value.length === 0) return
+
+  couponsLoading.value = true
+  try {
+    const cartItemIds = selectedItems.value.map(item => item.id)
+    const response = await api.validateCouponsForOrder(cartItemIds)
+    availableCoupons.value = response.available
+    unavailableCoupons.value = response.unavailable
+  } catch (error) {
+    console.error('加载优惠券失败:', error)
+  } finally {
+    couponsLoading.value = false
+  }
+}
+
+function openCouponDialog() {
+  tempSelectedCoupon.value = selectedCoupon.value
+  couponDialogVisible.value = true
+}
+
+function selectCoupon(coupon: UserCoupon) {
+  tempSelectedCoupon.value = coupon
+}
+
+function clearCoupon() {
+  selectedCoupon.value = null
+  ElMessage.success('已取消使用优惠券')
+}
+
+function confirmCouponSelection() {
+  selectedCoupon.value = tempSelectedCoupon.value
+  couponDialogVisible.value = false
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
 async function handleSubmit() {
   if (!formRef.value) return
 
@@ -229,16 +388,16 @@ async function handleSubmit() {
     return
   }
 
+  const confirmMessage = selectedCoupon.value
+    ? `确认提交订单吗？\n商品金额：¥${cartStore.selectedPrice.toFixed(2)}\n优惠金额：¥${discountAmount.value.toFixed(2)}\n应付金额：¥${finalPrice.value.toFixed(2)}`
+    : `确认提交订单吗？应付金额 ¥${cartStore.selectedPrice.toFixed(2)}`
+
   try {
-    await ElMessageBox.confirm(
-      `确认提交订单吗？应付金额 ¥${cartStore.selectedPrice.toFixed(2)}`,
-      '提交订单',
-      {
-        confirmButtonText: '确认提交',
-        cancelButtonText: '再想想',
-        type: 'warning'
-      }
-    )
+    await ElMessageBox.confirm(confirmMessage, '提交订单', {
+      confirmButtonText: '确认提交',
+      cancelButtonText: '再想想',
+      type: 'warning'
+    })
   } catch {
     return
   }
@@ -246,10 +405,16 @@ async function handleSubmit() {
   submitting.value = true
   try {
     const cartItemIds = selectedItems.value.map(item => item.id)
-    const response = await api.createOrder({
+    const orderData: OrderCreateWithCoupon = {
       ...formData.value,
       cart_item_ids: cartItemIds
-    })
+    }
+
+    if (selectedCoupon.value) {
+      orderData.user_coupon_id = selectedCoupon.value.id
+    }
+
+    const response = await api.createOrder(orderData)
 
     ElMessage.success('订单提交成功！')
     await cartStore.fetchCart()
@@ -460,6 +625,175 @@ async function handleSubmit() {
 .back-btn {
   width: 100%;
   margin-top: 12px;
+}
+
+.coupon-section {
+  padding: 16px 0;
+  border-top: 1px dashed var(--border-color);
+}
+
+.coupon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.coupon-title {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.selected-coupon-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: #fff;
+}
+
+.coupon-badge {
+  flex-shrink: 0;
+}
+
+.coupon-badge-amount {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.coupon-badge-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.coupon-badge-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.coupon-badge-desc {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.selected-coupon-info .el-button {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.discount-info {
+  text-align: right;
+  font-size: 13px;
+  color: var(--danger-color);
+  margin-bottom: 12px;
+}
+
+.coupon-select-list {
+  max-height: 500px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.coupon-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.coupon-select-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.coupon-select-item:hover {
+  border-color: var(--primary-color);
+}
+
+.coupon-select-item.selected {
+  border-color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.coupon-select-item.unavailable {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.coupon-select-left {
+  width: 100px;
+  text-align: center;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.coupon-select-item.unavailable .coupon-select-left {
+  background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+}
+
+.coupon-select-amount {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.coupon-select-threshold {
+  display: block;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.coupon-select-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.coupon-select-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.coupon-select-valid {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.coupon-select-cats {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.unavailable-reason {
+  margin-top: 6px;
+}
+
+.coupon-select-radio {
+  flex-shrink: 0;
 }
 
 @media (max-width: 1024px) {
