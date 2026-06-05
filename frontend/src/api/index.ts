@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -160,5 +160,32 @@ export const api = {
         instance.put(`/authors/${id}`, author),
 
     deleteAuthor: (id: number): Promise<void> =>
-        instance.delete(`/authors/${id}`)
+        instance.delete(`/authors/${id}`),
+
+    getPublishers: (params?: { page?: number; page_size?: number; search?: string; is_active?: boolean }): Promise<PublisherListResponse> =>
+        instance.get('/publishers', { params }),
+
+    getPublisher: (id: number): Promise<PublisherDetail> =>
+        instance.get(`/publishers/${id}`),
+
+    getPublisherBooks: (publisherId: number, params?: { page?: number; page_size?: number }): Promise<BookListResponse> =>
+        instance.get(`/publishers/${publisherId}/books`, { params }),
+
+    searchPublishers: (keyword: string, limit?: number, include_inactive?: boolean): Promise<PublisherSearchResult[]> =>
+        instance.get('/publishers/search', { params: { keyword, limit, include_inactive } }),
+
+    checkPublisherName: (name: string, exclude_id?: number): Promise<PublisherNameCheckResponse> =>
+        instance.get('/publishers/check-name', { params: { name, exclude_id } }),
+
+    checkPublisherDelete: (publisherId: number): Promise<PublisherBookCheckResponse> =>
+        instance.get(`/publishers/${publisherId}/check-delete`),
+
+    createPublisher: (publisher: PublisherCreate): Promise<Publisher> =>
+        instance.post('/publishers', publisher),
+
+    updatePublisher: (id: number, publisher: PublisherUpdate): Promise<Publisher> =>
+        instance.put(`/publishers/${id}`, publisher),
+
+    deletePublisher: (id: number): Promise<void> =>
+        instance.delete(`/publishers/${id}`)
 }

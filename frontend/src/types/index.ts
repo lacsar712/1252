@@ -66,11 +66,78 @@ export interface AuthorBookCheckResponse {
     message: string | null
 }
 
+export interface Publisher {
+    id: number
+    name: string
+    logo: string | null
+    website: string | null
+    location: string | null
+    description: string | null
+    founded_year: number | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface PublisherDetail extends Publisher {
+    book_count: number
+    category_distribution: { category: string; count: number }[]
+    recent_books: Book[]
+    books: Book[]
+}
+
+export interface PublisherListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Publisher[]
+}
+
+export interface PublisherCreate {
+    name: string
+    logo?: string
+    website?: string
+    location?: string
+    description?: string
+    founded_year?: number
+    is_active: boolean
+}
+
+export interface PublisherUpdate {
+    name?: string
+    logo?: string
+    website?: string
+    location?: string
+    description?: string
+    founded_year?: number
+    is_active?: boolean
+}
+
+export interface PublisherSearchResult {
+    id: number
+    name: string
+    location: string | null
+    logo: string | null
+    is_active: boolean
+}
+
+export interface PublisherNameCheckResponse {
+    available: boolean
+    message: string | null
+}
+
+export interface PublisherBookCheckResponse {
+    can_delete: boolean
+    linked_books: number
+    message: string | null
+}
+
 export interface Book {
     id: number
     title: string
     author: string
     publisher: string | null
+    publisher_id: number | null
     isbn: string | null
     price: number
     stock: number
@@ -80,6 +147,21 @@ export interface Book {
     created_at: string
     updated_at: string
     authors: Author[]
+    publisher_info: Publisher | null
+}
+
+export interface BookCreate {
+    title: string
+    author: string
+    publisher?: string
+    publisher_id?: number | null
+    isbn?: string
+    price: number
+    stock?: number
+    description?: string
+    cover_image?: string
+    category?: string
+    author_ids?: number[]
 }
 
 export interface BookListResponse {

@@ -18,6 +18,24 @@ book_author = Table(
 )
 
 
+class Publisher(Base):
+    """出版社模型"""
+    __tablename__ = "publishers"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, index=True, unique=True)
+    logo = Column(String(500), nullable=True)
+    website = Column(String(500), nullable=True)
+    location = Column(String(200), nullable=True)
+    description = Column(Text, nullable=True)
+    founded_year = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    books = relationship("Book", back_populates="publisher")
+
+
 class Author(Base):
     """作者模型"""
     __tablename__ = "authors"
@@ -58,6 +76,7 @@ class Book(Base):
     title = Column(String(200), nullable=False, index=True)
     author = Column(String(100), nullable=False, index=True)
     publisher = Column(String(100), nullable=True)
+    publisher_id = Column(Integer, ForeignKey("publishers.id"), nullable=True, index=True)
     isbn = Column(String(20), unique=True, nullable=True)
     price = Column(Float, nullable=False)
     stock = Column(Integer, default=0)
@@ -68,6 +87,7 @@ class Book(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     authors = relationship("Author", secondary=book_author, back_populates="books")
+    publisher_rel = relationship("Publisher", back_populates="books")
 
 
 class CartItem(Base):

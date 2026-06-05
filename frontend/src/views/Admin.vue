@@ -418,6 +418,117 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="出版社管理" name="publishers">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>出版社管理</h1>
+            <el-button type="primary" @click="handleAddPublisher">
+              <el-icon><Plus /></el-icon>
+              添加出版社
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-input
+              v-model="publisherSearchQuery"
+              placeholder="搜索出版社名称或所在地..."
+              clearable
+              @keyup.enter="fetchPublishers"
+              style="max-width: 300px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="publisherStatusFilter"
+              placeholder="启用状态"
+              clearable
+              style="width: 150px"
+              @change="fetchPublishers"
+            >
+              <el-option label="已启用" :value="true" />
+              <el-option label="已停用" :value="false" />
+            </el-select>
+            <el-button @click="fetchPublishers">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="publishers"
+            v-loading="publishersLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column label="Logo" width="70">
+              <template #default="{ row }">
+                <img
+                  :src="row.logo || defaultPublisherLogo"
+                  :alt="row.name"
+                  class="publisher-logo"
+                  @error="handlePublisherLogoError"
+                >
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="出版社名称" min-width="160">
+              <template #default="{ row }">
+                <span class="publisher-name">{{ row.name }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="location" label="所在地" width="140">
+              <template #default="{ row }">
+                <span>{{ row.location || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="founded_year" label="成立年份" width="100">
+              <template #default="{ row }">
+                <span>{{ row.founded_year || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="website" label="官网" min-width="180">
+              <template #default="{ row }">
+                <a v-if="row.website" :href="row.website" target="_blank" class="link-text">
+                  {{ row.website }}
+                </a>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="启用状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '已启用' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEditPublisher(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  :title="`确定要删除出版社「${row.name}」吗？`"
+                  @confirm="handleDeletePublisher(row)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="publishersCurrentPage"
+              v-model:page-size="publishersPageSize"
+              :total="publishersTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchPublishers"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
     
     <el-dialog
@@ -472,11 +583,43 @@
           </el-select>
           <span class="form-tip">从作者档案中选择，支持多选。若未选择，则仅显示作者文本。</span>
         </el-form-item>
+
+        <el-form-item label="关联出版社" prop="publisher_id">
+          <el-select
+            v-model="selectedPublisherId"
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索并选择出版社"
+            :remote-method="handlePublisherSearch"
+            :loading="publisherSearchLoading"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in publisherSearchOptions"
+              :key="item.id"
+              :label="item.name + (item.location ? `（${item.location}）` : '') + (!item.is_active ? ' - 已禁用' : '')"
+              :value="item.id"
+              :disabled="!item.is_active"
+            >
+              <div class="publisher-option">
+                <img :src="item.logo || defaultPublisherLogo" :alt="item.name" class="publisher-option-logo" @error="handlePublisherOptionLogoError" />
+                <div class="publisher-option-info">
+                  <span class="publisher-option-name" :class="{ 'text-muted': !item.is_active }">{{ item.name }}</span>
+                  <span v-if="item.location" class="publisher-option-location">{{ item.location }}</span>
+                  <el-tag v-if="!item.is_active" size="small" type="info" style="margin-left: 8px;">已禁用</el-tag>
+                </div>
+              </div>
+            </el-option>
+          </el-select>
+          <span class="form-tip">从出版社档案中选择。选择后将自动填充出版社名称。已禁用的出版社无法选择。</span>
+        </el-form-item>
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="出版社" prop="publisher">
-              <el-input v-model="bookForm.publisher" placeholder="请输入出版社" />
+            <el-form-item label="出版社文本" prop="publisher">
+              <el-input v-model="bookForm.publisher" placeholder="出版社名称（选择关联后自动填充）" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -745,6 +888,88 @@
     </el-dialog>
 
     <el-dialog
+      v-model="publisherDialogVisible"
+      :title="isPublisherEdit ? '编辑出版社' : '添加出版社'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="publisherFormRef"
+        :model="publisherForm"
+        :rules="publisherRules"
+        label-width="100px"
+      >
+        <el-form-item label="出版社名称" prop="name">
+          <el-input
+            v-model="publisherForm.name"
+            placeholder="请输入出版社名称"
+            maxlength="100"
+            show-word-limit
+            @blur="checkPublisherNameUnique"
+          />
+          <span v-if="publisherNameError" class="error-text">{{ publisherNameError }}</span>
+        </el-form-item>
+
+        <el-form-item label="Logo URL" prop="logo">
+          <el-input v-model="publisherForm.logo" placeholder="请输入Logo图片URL（可选）" />
+          <div v-if="publisherForm.logo" class="logo-preview">
+            <img :src="publisherForm.logo" alt="Logo预览" @error="handlePublisherFormLogoError" />
+          </div>
+          <span class="form-tip">建议尺寸：200x200像素。如果Logo加载失败将显示默认图标。</span>
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="所在地" prop="location">
+              <el-input v-model="publisherForm.location" placeholder="请输入所在地" maxlength="200" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="成立年份" prop="founded_year">
+              <el-input-number
+                v-model="publisherForm.founded_year"
+                :min="0"
+                :max="3000"
+                :precision="0"
+                controls-position="right"
+                style="width: 100%"
+                placeholder="请输入成立年份"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="官网地址" prop="website">
+          <el-input v-model="publisherForm.website" placeholder="请输入官网地址（可选）" maxlength="500" />
+        </el-form-item>
+
+        <el-form-item label="出版社简介" prop="description">
+          <el-input
+            v-model="publisherForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入出版社简介（可选）"
+          />
+        </el-form-item>
+
+        <el-form-item label="启用状态" prop="is_active">
+          <el-radio-group v-model="publisherForm.is_active">
+            <el-radio :value="true">启用</el-radio>
+            <el-radio :value="false">停用</el-radio>
+          </el-radio-group>
+          <span class="form-tip">注意：已有关联图书的出版社无法停用。</span>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="publisherDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="publisherSubmitting" @click="handlePublisherSubmit">
+          {{ isPublisherEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="orderDetailVisible"
       title="订单详情"
       width="800px"
@@ -932,7 +1157,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 
@@ -1052,6 +1277,39 @@ const authorRules: FormRules = {
   name: [{ required: true, message: '请输入作者姓名', trigger: 'blur' }]
 }
 
+const publishersLoading = ref(false)
+const publishers = ref<Publisher[]>([])
+const publishersTotal = ref(0)
+const publishersCurrentPage = ref(1)
+const publishersPageSize = ref(10)
+const publisherSearchQuery = ref('')
+const publisherStatusFilter = ref<boolean | ''>('')
+const publisherDialogVisible = ref(false)
+const isPublisherEdit = ref(false)
+const publisherEditingId = ref<number | null>(null)
+const publisherSubmitting = ref(false)
+const publisherFormRef = ref<FormInstance>()
+const defaultPublisherLogo = 'https://via.placeholder.com/60x60/f59e0b/ffffff?text=Pub'
+const publisherNameError = ref('')
+
+const publisherSearchLoading = ref(false)
+const publisherSearchOptions = ref<PublisherSearchResult[]>([])
+const selectedPublisherId = ref<number | null>(null)
+
+const publisherForm = reactive<PublisherCreate>({
+  name: '',
+  logo: '',
+  website: '',
+  location: '',
+  description: '',
+  founded_year: undefined,
+  is_active: true
+})
+
+const publisherRules: FormRules = {
+  name: [{ required: true, message: '请输入出版社名称', trigger: 'blur' }]
+}
+
 const bookForm = reactive<BookCreate>({
   title: '',
   author: '',
@@ -1083,6 +1341,9 @@ watch(activeTab, (newTab) => {
   }
   if (newTab === 'authors' && authors.value.length === 0) {
     fetchAuthors()
+  }
+  if (newTab === 'publishers' && publishers.value.length === 0) {
+    fetchPublishers()
   }
 })
 
@@ -1494,6 +1755,165 @@ function handleAuthorOptionAvatarError(e: Event) {
   img.src = defaultAuthorAvatar
 }
 
+async function fetchPublishers() {
+  publishersLoading.value = true
+  try {
+    const response = await api.getPublishers({
+      page: publishersCurrentPage.value,
+      page_size: publishersPageSize.value,
+      search: publisherSearchQuery.value || undefined,
+      is_active: publisherStatusFilter.value === '' ? undefined : publisherStatusFilter.value
+    })
+    publishers.value = response.items
+    publishersTotal.value = response.total
+  } catch (error) {
+    console.error('获取出版社列表失败:', error)
+  } finally {
+    publishersLoading.value = false
+  }
+}
+
+function handleAddPublisher() {
+  isPublisherEdit.value = false
+  publisherEditingId.value = null
+  resetPublisherForm()
+  publisherNameError.value = ''
+  publisherDialogVisible.value = true
+}
+
+function handleEditPublisher(publisher: Publisher) {
+  isPublisherEdit.value = true
+  publisherEditingId.value = publisher.id
+  Object.assign(publisherForm, {
+    name: publisher.name,
+    logo: publisher.logo || '',
+    website: publisher.website || '',
+    location: publisher.location || '',
+    description: publisher.description || '',
+    founded_year: publisher.founded_year || undefined,
+    is_active: publisher.is_active
+  })
+  publisherNameError.value = ''
+  publisherDialogVisible.value = true
+}
+
+async function handleDeletePublisher(publisher: Publisher) {
+  try {
+    const checkResult = await api.checkPublisherDelete(publisher.id)
+    if (!checkResult.can_delete) {
+      ElMessage.warning(checkResult.message || '该出版社有关联的图书，无法删除')
+      return
+    }
+    await api.deletePublisher(publisher.id)
+    ElMessage.success('删除成功')
+    fetchPublishers()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function checkPublisherNameUnique() {
+  if (!publisherForm.name || publisherForm.name.trim() === '') {
+    publisherNameError.value = ''
+    return
+  }
+  try {
+    const result = await api.checkPublisherName(
+      publisherForm.name.trim(),
+      isPublisherEdit.value && publisherEditingId.value ? publisherEditingId.value : undefined
+    )
+    if (!result.available) {
+      publisherNameError.value = result.message || '名称已存在'
+    } else {
+      publisherNameError.value = ''
+    }
+  } catch (error) {
+    console.error('校验名称失败:', error)
+  }
+}
+
+async function handlePublisherSubmit() {
+  if (!publisherFormRef.value) return
+  
+  await publisherFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    if (publisherNameError.value) {
+      ElMessage.error(publisherNameError.value)
+      return
+    }
+    
+    publisherSubmitting.value = true
+    try {
+      if (isPublisherEdit.value && publisherEditingId.value) {
+        const updateData: PublisherUpdate = { ...publisherForm }
+        await api.updatePublisher(publisherEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createPublisher(publisherForm)
+        ElMessage.success('添加成功')
+      }
+      publisherDialogVisible.value = false
+      fetchPublishers()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      publisherSubmitting.value = false
+    }
+  })
+}
+
+function resetPublisherForm() {
+  Object.assign(publisherForm, {
+    name: '',
+    logo: '',
+    website: '',
+    location: '',
+    description: '',
+    founded_year: undefined,
+    is_active: true
+  })
+}
+
+async function handlePublisherSearch(query: string) {
+  if (!query || query.trim() === '') {
+    publisherSearchOptions.value = []
+    return
+  }
+  publisherSearchLoading.value = true
+  try {
+    publisherSearchOptions.value = await api.searchPublishers(query.trim(), 20, true)
+  } catch (error) {
+    console.error('搜索出版社失败:', error)
+  } finally {
+    publisherSearchLoading.value = false
+  }
+}
+
+function handlePublisherLogoError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultPublisherLogo
+}
+
+function handlePublisherFormLogoError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultPublisherLogo
+}
+
+function handlePublisherOptionLogoError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultPublisherLogo
+}
+
+watch(selectedPublisherId, (newVal) => {
+  if (newVal) {
+    const selected = publisherSearchOptions.value.find(p => p.id === newVal)
+    if (selected) {
+      bookForm.publisher = selected.name
+    }
+  }
+})
+
 function handleEdit(book: Book) {
   isEdit.value = true
   editingId.value = book.id
@@ -1501,6 +1921,7 @@ function handleEdit(book: Book) {
     title: book.title,
     author: book.author,
     publisher: book.publisher || '',
+    publisher_id: book.publisher_id || null,
     isbn: book.isbn || '',
     price: book.price,
     stock: book.stock,
@@ -1509,6 +1930,16 @@ function handleEdit(book: Book) {
     category: book.category || ''
   })
   selectedAuthorIds.value = book.authors ? book.authors.map(a => a.id) : []
+  selectedPublisherId.value = book.publisher_id || null
+  if (book.publisher_id) {
+    publisherSearchOptions.value = [{
+      id: book.publisher_id,
+      name: book.publisher || '',
+      location: book.publisher_info?.location || null,
+      logo: book.publisher_info?.logo || null,
+      is_active: book.publisher_info?.is_active ?? true
+    }]
+  }
   dialogVisible.value = true
 }
 
@@ -1517,6 +1948,8 @@ function handleAdd() {
   editingId.value = null
   resetForm()
   selectedAuthorIds.value = []
+  selectedPublisherId.value = null
+  publisherSearchOptions.value = []
   dialogVisible.value = true
 }
 
@@ -1530,7 +1963,8 @@ async function handleSubmit() {
     try {
       const submitData: BookCreate = {
         ...bookForm,
-        author_ids: selectedAuthorIds.value.length > 0 ? selectedAuthorIds.value : undefined
+        author_ids: selectedAuthorIds.value.length > 0 ? selectedAuthorIds.value : undefined,
+        publisher_id: selectedPublisherId.value || undefined
       }
       if (isEdit.value && editingId.value) {
         await api.updateBook(editingId.value, submitData)
@@ -1748,5 +2182,79 @@ async function handleSubmit() {
   font-size: 12px;
   color: var(--text-muted);
   margin-left: 4px;
+}
+
+.publisher-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.publisher-name {
+  font-weight: 500;
+}
+
+.link-text {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.link-text:hover {
+  text-decoration: underline;
+}
+
+.logo-preview {
+  margin-top: 8px;
+}
+
+.logo-preview img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.publisher-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.publisher-option-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.publisher-option-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.publisher-option-name {
+  font-weight: 500;
+}
+
+.publisher-option-location {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.error-text {
+  color: var(--danger-color);
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
 }
 </style>

@@ -41,7 +41,13 @@
             </div>
             <div class="meta-item" v-if="book.publisher">
               <el-icon><OfficeBuilding /></el-icon>
-              <span>出版社：{{ book.publisher }}</span>
+              <span>出版社：</span>
+              <template v-if="book.publisher_info && book.publisher_info.is_active">
+                <router-link :to="`/publishers/${book.publisher_info.id}`" class="publisher-link">
+                  {{ book.publisher }}
+                </router-link>
+              </template>
+              <span v-else>{{ book.publisher }}</span>
             </div>
             <div class="meta-item" v-if="book.isbn">
               <el-icon><Document /></el-icon>
@@ -296,6 +302,17 @@ function handleBuyNow() {
 .no-author {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.publisher-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.publisher-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
 }
 
 .book-price-section,

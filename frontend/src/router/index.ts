@@ -71,6 +71,12 @@ const routes: RouteRecordRaw[] = [
                 name: 'AuthorDetail',
                 component: () => import('@/views/AuthorDetail.vue'),
                 meta: { title: '作者详情' }
+            },
+            {
+                path: 'publishers/:id',
+                name: 'PublisherDetail',
+                component: () => import('@/views/PublisherDetail.vue'),
+                meta: { title: '出版社详情' }
             }
         ]
     },

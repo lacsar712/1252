@@ -9,12 +9,27 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from database import get_db
-from models import Book, User, Author
-from schemas import BookCreate, BookUpdate, BookResponse, BookListResponse
+from models import Book, User, Author, Publisher
+from schemas import BookCreate, BookUpdate, BookResponse, BookListResponse, PublisherResponse
 from auth import get_current_admin_user, get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/books", tags=["图书管理"])
+
+
+def _build_book_response(book: Book, db: Session) -> BookResponse:
+    """构建包含出版社信息的图书响应"""
+    publisher_info = None
+    if book.publisher_id:
+        publisher = db.query(Publisher).filter(Publisher.id == book.publisher_id).first()
+        if publisher:
+            publisher_info = PublisherResponse.model_validate(publisher)
+    
+    book_dict = {c.name: getattr(book, c.name) for c in book.__table__.columns}
+    book_dict['authors'] = book.authors
+    book_dict['publisher_info'] = publisher_info
+    
+    return BookResponse(**book_dict)
 
 
 @router.get("", response_model=BookListResponse)
@@ -28,7 +43,6 @@ def get_books(
     """获取图书列表（支持分页和搜索）"""
     query = db.query(Book)
     
-    # 搜索过滤
     if search:
         search_pattern = f"%{search}%"
         query = query.filter(
@@ -39,22 +53,21 @@ def get_books(
             )
         )
     
-    # 分类过滤
     if category:
         query = query.filter(Book.category == category)
     
-    # 获取总数
     total = query.count()
     
-    # 分页
     offset = (page - 1) * page_size
     books = query.order_by(Book.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    book_responses = [_build_book_response(book, db) for book in books]
     
     return BookListResponse(
         total=total,
         page=page,
         page_size=page_size,
-        items=books
+        items=book_responses
     )
 
 
@@ -74,7 +87,7 @@ def get_book(book_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="图书不存在"
         )
-    return book
+    return _build_book_response(book, db)
 
 
 @router.post("", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
@@ -84,7 +97,6 @@ def create_book(
     current_user: User = Depends(get_current_admin_user)
 ):
     """创建图书（需要管理员权限）"""
-    # 检查ISBN是否重复
     if book.isbn:
         existing_book = db.query(Book).filter(Book.isbn == book.isbn).first()
         if existing_book:
@@ -95,10 +107,25 @@ def create_book(
     
     book_data = book.model_dump()
     author_ids = book_data.pop('author_ids', None)
+    publisher_id = book_data.pop('publisher_id', None)
     
     db_book = Book(**book_data)
     
-    # 处理多作者关联
+    if publisher_id:
+        publisher = db.query(Publisher).filter(Publisher.id == publisher_id).first()
+        if not publisher:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="出版社不存在"
+            )
+        if not publisher.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"出版社「{publisher.name}」已被禁用，无法关联"
+            )
+        db_book.publisher_id = publisher_id
+        db_book.publisher = publisher.name
+    
     if author_ids:
         authors = db.query(Author).filter(Author.id.in_(author_ids)).all()
         if len(authors) != len(author_ids):
@@ -113,7 +140,7 @@ def create_book(
     db.refresh(db_book)
     
     logger.info(f"图书创建成功: {book.title} (by {current_user.username})")
-    return db_book
+    return _build_book_response(db_book, db)
 
 
 @router.put("/{book_id}", response_model=BookResponse)
@@ -131,14 +158,31 @@ def update_book(
             detail="图书不存在"
         )
     
-    # 更新字段
     update_data = book_update.model_dump(exclude_unset=True)
     author_ids = update_data.pop('author_ids', None)
+    publisher_id = update_data.pop('publisher_id', None)
     
     for field, value in update_data.items():
         setattr(db_book, field, value)
     
-    # 处理多作者关联更新
+    if publisher_id is not None:
+        if publisher_id == 0 or publisher_id is None:
+            db_book.publisher_id = None
+        else:
+            publisher = db.query(Publisher).filter(Publisher.id == publisher_id).first()
+            if not publisher:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="出版社不存在"
+                )
+            if not publisher.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"出版社「{publisher.name}」已被禁用，无法关联"
+                )
+            db_book.publisher_id = publisher_id
+            db_book.publisher = publisher.name
+    
     if author_ids is not None:
         if len(author_ids) > 0:
             authors = db.query(Author).filter(Author.id.in_(author_ids)).all()
@@ -155,7 +199,7 @@ def update_book(
     db.refresh(db_book)
     
     logger.info(f"图书更新成功: {db_book.title} (by {current_user.username})")
-    return db_book
+    return _build_book_response(db_book, db)
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)

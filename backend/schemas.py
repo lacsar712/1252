@@ -102,6 +102,7 @@ class BookBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     author: str = Field(..., min_length=1, max_length=100)
     publisher: Optional[str] = Field(None, max_length=100)
+    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
     isbn: Optional[str] = Field(None, max_length=20)
     price: float = Field(..., gt=0)
     stock: int = Field(default=0, ge=0)
@@ -118,6 +119,7 @@ class BookUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     author: Optional[str] = Field(None, min_length=1, max_length=100)
     publisher: Optional[str] = Field(None, max_length=100)
+    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
     isbn: Optional[str] = Field(None, max_length=20)
     price: Optional[float] = Field(None, gt=0)
     stock: Optional[int] = Field(None, ge=0)
@@ -132,6 +134,7 @@ class BookResponse(BookBase):
     created_at: datetime
     updated_at: datetime
     authors: List[AuthorResponse] = Field([], description="关联作者列表")
+    publisher_info: Optional[PublisherResponse] = Field(None, description="关联出版社信息")
 
     class Config:
         from_attributes = True
@@ -145,6 +148,76 @@ class BookListResponse(BaseModel):
 
 
 AuthorDetailResponse.model_rebuild()
+
+
+# ========== 出版社相关 Schema ==========
+class PublisherBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="出版社名称")
+    logo: Optional[str] = Field(None, max_length=500, description="Logo URL")
+    website: Optional[str] = Field(None, max_length=500, description="官网地址")
+    location: Optional[str] = Field(None, max_length=200, description="所在地")
+    description: Optional[str] = Field(None, description="出版社简介")
+    founded_year: Optional[int] = Field(None, ge=0, le=3000, description="成立年份")
+    is_active: bool = Field(True, description="启用状态")
+
+
+class PublisherCreate(PublisherBase):
+    pass
+
+
+class PublisherUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="出版社名称")
+    logo: Optional[str] = Field(None, max_length=500, description="Logo URL")
+    website: Optional[str] = Field(None, max_length=500, description="官网地址")
+    location: Optional[str] = Field(None, max_length=200, description="所在地")
+    description: Optional[str] = Field(None, description="出版社简介")
+    founded_year: Optional[int] = Field(None, ge=0, le=3000, description="成立年份")
+    is_active: Optional[bool] = Field(None, description="启用状态")
+
+
+class PublisherResponse(PublisherBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PublisherDetailResponse(PublisherResponse):
+    book_count: int = Field(0, description="图书数量")
+    category_distribution: List[dict] = Field([], description="分类分布")
+    recent_books: List["BookResponse"] = Field([], description="最近上架书籍")
+    books: List["BookResponse"] = Field([], description="旗下图书")
+
+
+class PublisherListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[PublisherResponse]
+
+
+class PublisherSearchResult(BaseModel):
+    id: int
+    name: str
+    location: Optional[str] = None
+    logo: Optional[str] = None
+    is_active: bool
+
+
+class PublisherNameCheckResponse(BaseModel):
+    available: bool = Field(..., description="名称是否可用")
+    message: Optional[str] = Field(None, description="提示信息")
+
+
+class PublisherBookCheckResponse(BaseModel):
+    can_delete: bool = Field(..., description="是否可以删除")
+    linked_books: int = Field(0, description="关联图书数量")
+    message: Optional[str] = Field(None, description="提示信息")
+
+
+PublisherDetailResponse.model_rebuild()
 
 
 # ========== 购物车相关 Schema ==========

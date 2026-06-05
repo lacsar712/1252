@@ -5,7 +5,7 @@
 import logging
 from sqlalchemy.orm import Session
 from database import engine, SessionLocal
-from models import Base, User, Book, Author
+from models import Base, User, Book, Author, Publisher
 from auth import get_password_hash
 
 logging.basicConfig(level=logging.INFO)
@@ -164,15 +164,73 @@ def seed_data():
         
         db.flush()
         
+        # 创建示例出版社
+        publishers = [
+            Publisher(
+                name="人民邮电出版社",
+                location="北京市",
+                founded_year=1953,
+                website="https://www.ryjiaoyu.com",
+                description="人民邮电出版社成立于1953年，是工业和信息化部主管的大型专业出版社，致力于科技、教育、大众等领域的出版工作。",
+                logo="https://via.placeholder.com/200x200/f59e0b/ffffff?text=RMYD",
+                is_active=True
+            ),
+            Publisher(
+                name="机械工业出版社",
+                location="北京市",
+                founded_year=1952,
+                website="https://www.cmpbook.com",
+                description="机械工业出版社成立于1952年，是国内最大的科技出版社之一，以出版科技、教育、经管类图书著称。",
+                logo="https://via.placeholder.com/200x200/3b82f6/ffffff?text=JXGY",
+                is_active=True
+            ),
+            Publisher(
+                name="电子工业出版社",
+                location="北京市",
+                founded_year=1982,
+                website="https://www.phei.com.cn",
+                description="电子工业出版社成立于1982年，是国内权威的电子信息类专业出版社，致力于电子信息、计算机等领域的出版。",
+                logo="https://via.placeholder.com/200x200/10b981/ffffff?text=DZGY",
+                is_active=True
+            ),
+            Publisher(
+                name="作家出版社",
+                location="北京市",
+                founded_year=1953,
+                website="https://www.zuojia.net.cn",
+                description="作家出版社成立于1953年，是中国作家协会直属的国家级文学专业出版社，以出版当代文学作品为主。",
+                logo="https://via.placeholder.com/200x200/ef4444/ffffff?text=ZJCB",
+                is_active=True
+            ),
+            Publisher(
+                name="重庆出版社",
+                location="重庆市",
+                founded_year=1950,
+                website="https://www.cqph.com",
+                description="重庆出版社成立于1950年，是重庆出版集团旗下的综合性出版社，出版范围涵盖社科、文学、科技等多个领域。",
+                logo="https://via.placeholder.com/200x200/8b5cf6/ffffff?text=CQCB",
+                is_active=True
+            )
+        ]
+        
+        for publisher in publishers:
+            db.add(publisher)
+        
+        db.flush()
+        
         # 创建作者映射字典
         author_map = {author.name: author for author in authors}
         
-        # 创建示例图书并关联作者
+        # 创建出版社映射字典
+        publisher_map = {publisher.name: publisher for publisher in publishers}
+        
+        # 创建示例图书并关联作者和出版社
         books = [
             Book(
                 title="Python编程：从入门到实践",
                 author="Eric Matthes",
                 publisher="人民邮电出版社",
+                publisher_id=publisher_map["人民邮电出版社"].id,
                 isbn="9787115428028",
                 price=89.00,
                 stock=50,
@@ -185,6 +243,7 @@ def seed_data():
                 title="JavaScript高级程序设计",
                 author="Nicholas C. Zakas",
                 publisher="人民邮电出版社",
+                publisher_id=publisher_map["人民邮电出版社"].id,
                 isbn="9787115545381",
                 price=129.00,
                 stock=35,
@@ -197,6 +256,7 @@ def seed_data():
                 title="深入理解计算机系统",
                 author="Randal E. Bryant",
                 publisher="机械工业出版社",
+                publisher_id=publisher_map["机械工业出版社"].id,
                 isbn="9787111544937",
                 price=139.00,
                 stock=20,
@@ -209,6 +269,7 @@ def seed_data():
                 title="算法导论",
                 author="Thomas H. Cormen",
                 publisher="机械工业出版社",
+                publisher_id=publisher_map["机械工业出版社"].id,
                 isbn="9787111407010",
                 price=128.00,
                 stock=25,
@@ -221,6 +282,7 @@ def seed_data():
                 title="代码整洁之道",
                 author="Robert C. Martin",
                 publisher="人民邮电出版社",
+                publisher_id=publisher_map["人民邮电出版社"].id,
                 isbn="9787115216878",
                 price=59.00,
                 stock=40,
@@ -233,6 +295,7 @@ def seed_data():
                 title="设计模式：可复用面向对象软件的基础",
                 author="Erich Gamma",
                 publisher="机械工业出版社",
+                publisher_id=publisher_map["机械工业出版社"].id,
                 isbn="9787111618331",
                 price=79.00,
                 stock=30,
@@ -245,6 +308,7 @@ def seed_data():
                 title="Vue.js设计与实现",
                 author="霍春阳",
                 publisher="人民邮电出版社",
+                publisher_id=publisher_map["人民邮电出版社"].id,
                 isbn="9787115583864",
                 price=89.00,
                 stock=45,
@@ -257,6 +321,7 @@ def seed_data():
                 title="React进阶实战",
                 author="徐超",
                 publisher="电子工业出版社",
+                publisher_id=publisher_map["电子工业出版社"].id,
                 isbn="9787121350627",
                 price=79.00,
                 stock=28,
@@ -269,6 +334,7 @@ def seed_data():
                 title="MySQL必知必会",
                 author="Ben Forta",
                 publisher="人民邮电出版社",
+                publisher_id=publisher_map["人民邮电出版社"].id,
                 isbn="9787115313980",
                 price=39.00,
                 stock=60,
@@ -281,6 +347,7 @@ def seed_data():
                 title="Redis设计与实现",
                 author="黄健宏",
                 publisher="机械工业出版社",
+                publisher_id=publisher_map["机械工业出版社"].id,
                 isbn="9787111464747",
                 price=79.00,
                 stock=35,
@@ -293,6 +360,7 @@ def seed_data():
                 title="活着",
                 author="余华",
                 publisher="作家出版社",
+                publisher_id=publisher_map["作家出版社"].id,
                 isbn="9787506365437",
                 price=45.00,
                 stock=80,
@@ -305,6 +373,7 @@ def seed_data():
                 title="三体",
                 author="刘慈欣",
                 publisher="重庆出版社",
+                publisher_id=publisher_map["重庆出版社"].id,
                 isbn="9787536692930",
                 price=68.00,
                 stock=55,
@@ -323,6 +392,7 @@ def seed_data():
         logger.info(f"  - 创建用户: admin (密码: 123456, 管理员)")
         logger.info(f"  - 创建用户: user (密码: 123456, 普通用户)")
         logger.info(f"  - 创建作者: {len(authors)} 位")
+        logger.info(f"  - 创建出版社: {len(publishers)} 家")
         logger.info(f"  - 创建图书: {len(books)} 本")
         
     except Exception as e:
