@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -229,5 +229,35 @@ export const api = {
         instance.get('/admin/messages/stats'),
 
     getDashboardStats: (days: TimeRange = 7): Promise<DashboardResponse> =>
-        instance.get('/admin/dashboard/stats', { params: { days } })
+        instance.get('/admin/dashboard/stats', { params: { days } }),
+
+    getBookLists: (params?: { page?: number; page_size?: number; search?: string; is_active?: boolean; category?: string }): Promise<BookListListResponse> =>
+        instance.get('/book-lists', { params }),
+
+    getBookList: (id: number): Promise<BookListDetail> =>
+        instance.get(`/book-lists/${id}`),
+
+    getBookListCategories: (): Promise<string[]> =>
+        instance.get('/book-lists/categories'),
+
+    createBookList: (data: BookListCreate): Promise<BookList> =>
+        instance.post('/book-lists', data),
+
+    updateBookList: (id: number, data: BookListUpdate): Promise<BookList> =>
+        instance.put(`/book-lists/${id}`, data),
+
+    deleteBookList: (id: number): Promise<void> =>
+        instance.delete(`/book-lists/${id}`),
+
+    addBooksToBookList: (id: number, data: BookListAddBooksRequest): Promise<BookListDetail> =>
+        instance.post(`/book-lists/${id}/books`, data),
+
+    updateBookInBookList: (listId: number, bookId: number, data: BookListUpdateBookRequest): Promise<BookListDetail> =>
+        instance.put(`/book-lists/${listId}/books/${bookId}`, data),
+
+    removeBookFromBookList: (listId: number, bookId: number): Promise<BookListDetail> =>
+        instance.delete(`/book-lists/${listId}/books/${bookId}`),
+
+    reorderBooksInBookList: (id: number, data: BookListReorderRequest): Promise<BookListDetail> =>
+        instance.put(`/book-lists/${id}/books/reorder`, data)
 }

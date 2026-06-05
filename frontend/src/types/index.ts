@@ -496,3 +496,71 @@ export interface DashboardResponse {
 }
 
 export type TimeRange = 7 | 30 | 90
+
+export interface BookList {
+    id: number
+    title: string
+    description: string | null
+    cover_image: string | null
+    is_active: boolean
+    sort_weight: number
+    category: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface BookListBook {
+    id: number
+    title: string
+    author: string
+    cover_image: string | null
+    price: number
+    category: string | null
+    sort_order: number
+    recommendation: string | null
+}
+
+export interface BookListDetail extends BookList {
+    book_count: number
+    books: BookListBook[]
+    categories: string[]
+}
+
+export interface BookListListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: BookList[]
+}
+
+export interface BookListCreate {
+    title: string
+    description?: string
+    cover_image?: string
+    is_active: boolean
+    sort_weight: number
+    category?: string
+    books?: { book_id: number; sort_order: number; recommendation?: string }[]
+}
+
+export interface BookListUpdate {
+    title?: string
+    description?: string
+    cover_image?: string
+    is_active?: boolean
+    sort_weight?: number
+    category?: string
+}
+
+export interface BookListAddBooksRequest {
+    books: { book_id: number; sort_order: number; recommendation?: string }[]
+}
+
+export interface BookListUpdateBookRequest {
+    sort_order?: number
+    recommendation?: string
+}
+
+export interface BookListReorderRequest {
+    book_ids: number[]
+}

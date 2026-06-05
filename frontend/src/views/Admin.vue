@@ -533,6 +533,114 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane label="书单管理" name="book-lists">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>书单管理</h1>
+            <el-button type="primary" @click="handleAddBookList">
+              <el-icon><Plus /></el-icon>
+              添加书单
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-input
+              v-model="bookListSearchQuery"
+              placeholder="搜索书单标题或简介..."
+              clearable
+              @keyup.enter="fetchBookLists"
+              style="max-width: 300px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="bookListStatusFilter"
+              placeholder="展示状态"
+              clearable
+              style="width: 150px"
+              @change="fetchBookLists"
+            >
+              <el-option label="已启用" :value="true" />
+              <el-option label="已停用" :value="false" />
+            </el-select>
+            <el-button @click="fetchBookLists">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="bookLists"
+            v-loading="bookListsLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column label="封面" width="80">
+              <template #default="{ row }">
+                <img
+                  :src="row.cover_image || defaultBookListCover"
+                  :alt="row.title"
+                  class="booklist-thumbnail"
+                  @error="handleBookListCoverError"
+                >
+              </template>
+            </el-table-column>
+            <el-table-column prop="title" label="书单标题" min-width="180">
+              <template #default="{ row }">
+                <span class="booklist-title">{{ row.title }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="category" label="分类" width="120">
+              <template #default="{ row }">
+                <el-tag v-if="row.category" size="small">{{ row.category }}</el-tag>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="sort_weight" label="排序权重" width="100" />
+            <el-table-column label="展示状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '已启用' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="created_at" label="创建时间" width="180">
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleManageBooks(row)">
+                  管理图书
+                </el-button>
+                <el-button link type="primary" @click="handleEditBookList(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  :title="`确定要删除书单「${row.title}」吗？`"
+                  @confirm="handleDeleteBookList(row.id)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="bookListsCurrentPage"
+              v-model:page-size="bookListsPageSize"
+              :total="bookListsTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchBookLists"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane label="消息管理" name="messages">
         <div class="tab-content">
           <div class="admin-header">
@@ -1082,6 +1190,201 @@
     </el-dialog>
 
     <el-dialog
+      v-model="bookListDialogVisible"
+      :title="isBookListEdit ? '编辑书单' : '添加书单'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="bookListFormRef"
+        :model="bookListForm"
+        :rules="bookListRules"
+        label-width="100px"
+      >
+        <el-form-item label="书单标题" prop="title">
+          <el-input v-model="bookListForm.title" placeholder="请输入书单标题" maxlength="200" show-word-limit />
+        </el-form-item>
+
+        <el-form-item label="书单简介" prop="description">
+          <el-input
+            v-model="bookListForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入书单简介"
+          />
+        </el-form-item>
+
+        <el-form-item label="封面URL" prop="cover_image">
+          <el-input v-model="bookListForm.cover_image" placeholder="请输入封面图片URL" />
+          <div v-if="bookListForm.cover_image" class="cover-preview">
+            <img :src="bookListForm.cover_image" alt="封面预览" @error="handleBookListFormCoverError" />
+          </div>
+        </el-form-item>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="关联分类" prop="category">
+              <el-input v-model="bookListForm.category" placeholder="请输入关联分类" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="排序权重" prop="sort_weight">
+              <el-input-number
+                v-model="bookListForm.sort_weight"
+                :min="0"
+                :max="999"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="展示状态" prop="is_active">
+          <el-radio-group v-model="bookListForm.is_active">
+            <el-radio :value="true">启用</el-radio>
+            <el-radio :value="false">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="bookListDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="bookListSubmitting" @click="handleBookListSubmit">
+          {{ isBookListEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="bookListBooksDialogVisible"
+      :title="`管理图书 - ${currentBookList?.title}`"
+      width="900px"
+      destroy-on-close
+    >
+      <div class="book-list-books-manager">
+        <div class="add-books-section">
+          <h3>添加图书</h3>
+          <div class="search-select-row">
+            <el-select
+              v-model="selectedBookIds"
+              multiple
+              filterable
+              remote
+              reserve-keyword
+              placeholder="搜索并选择图书（可多选）"
+              :remote-method="handleBookSearch"
+              :loading="bookSearchLoading"
+              style="flex: 1"
+            >
+              <el-option
+                v-for="item in bookSearchOptions"
+                :key="item.id"
+                :label="`${item.title} - ${item.author}`"
+                :value="item.id"
+              >
+                <div class="book-option">
+                  <img :src="item.cover_image || defaultCover" :alt="item.title" class="book-option-cover" @error="handleBookOptionCoverError" />
+                  <div class="book-option-info">
+                    <span class="book-option-title">{{ item.title }}</span>
+                    <span class="book-option-author">{{ item.author }}</span>
+                  </div>
+                </div>
+              </el-option>
+            </el-select>
+            <el-button type="primary" :disabled="selectedBookIds.length === 0" @click="handleAddBooksToList">
+              添加到书单
+            </el-button>
+          </div>
+        </div>
+
+        <div class="books-list-section">
+          <h3>书单图书 ({{ currentBookListDetail?.books?.length || 0 }} 本)</h3>
+          <el-empty v-if="!currentBookListDetail?.books?.length" description="书单暂无图书，请添加图书" />
+          <el-table
+            v-else
+            :data="currentBookListDetail?.books"
+            row-key="id"
+            border
+            style="width: 100%"
+          >
+            <el-table-column type="index" label="序号" width="60" />
+            <el-table-column label="排序" width="80">
+              <template #default="{ row, $index }">
+                <div class="sort-buttons">
+                  <el-button
+                    size="small"
+                    circle
+                    :disabled="$index === 0"
+                    @click="handleMoveBookUp($index)"
+                  >
+                    <el-icon><Top /></el-icon>
+                  </el-button>
+                  <el-button
+                    size="small"
+                    circle
+                    :disabled="$index === (currentBookListDetail?.books?.length || 1) - 1"
+                    @click="handleMoveBookDown($index)"
+                  >
+                    <el-icon><Bottom /></el-icon>
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="图书" min-width="250">
+              <template #default="{ row }">
+                <div class="book-item">
+                  <img
+                    :src="row.cover_image || defaultCover"
+                    :alt="row.title"
+                    class="book-item-cover"
+                    @error="handleImageError"
+                  >
+                  <div class="book-item-info">
+                    <div class="book-item-title">{{ row.title }}</div>
+                    <div class="book-item-author">{{ row.author }}</div>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="价格" width="100">
+              <template #default="{ row }">
+                ¥{{ row.price.toFixed(2) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="推荐语" min-width="200">
+              <template #default="{ row }">
+                <el-input
+                  v-model="row.recommendation"
+                  type="textarea"
+                  :rows="2"
+                  placeholder="输入推荐语（可选）"
+                  @blur="handleUpdateBookRecommendation(row)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="{ row }">
+                <el-popconfirm
+                  title="确定要移除此图书吗？"
+                  @confirm="handleRemoveBook(row.id)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>移除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="bookListBooksDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="orderDetailVisible"
       title="订单详情"
       width="800px"
@@ -1374,9 +1677,9 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search, User } from '@element-plus/icons-vue'
+import { Plus, Search, User, Top, Bottom } from '@element-plus/icons-vue'
 import Dashboard from '@/components/Dashboard.vue'
 
 const route = useRoute()
@@ -1547,6 +1850,41 @@ const messageStats = reactive<MessageStatsResponse>({
 const announcementDialogVisible = ref(false)
 const announcementSubmitting = ref(false)
 const announcementFormRef = ref<FormInstance>()
+
+const bookListsLoading = ref(false)
+const bookLists = ref<BookList[]>([])
+const bookListsTotal = ref(0)
+const bookListsCurrentPage = ref(1)
+const bookListsPageSize = ref(10)
+const bookListSearchQuery = ref('')
+const bookListStatusFilter = ref<boolean | ''>('')
+const bookListDialogVisible = ref(false)
+const isBookListEdit = ref(false)
+const bookListEditingId = ref<number | null>(null)
+const bookListSubmitting = ref(false)
+const bookListFormRef = ref<FormInstance>()
+const defaultBookListCover = 'https://via.placeholder.com/120x160/10b981/ffffff?text=BookList'
+
+const bookListForm = reactive<BookListCreate>({
+  title: '',
+  description: '',
+  cover_image: '',
+  is_active: true,
+  sort_weight: 0,
+  category: '',
+  books: []
+})
+
+const bookListRules: FormRules = {
+  title: [{ required: true, message: '请输入书单标题', trigger: 'blur' }]
+}
+
+const bookListBooksDialogVisible = ref(false)
+const currentBookList = ref<BookList | null>(null)
+const currentBookListDetail = ref<BookListDetail | null>(null)
+const selectedBookIds = ref<number[]>([])
+const bookSearchLoading = ref(false)
+const bookSearchOptions = ref<Book[]>([])
 const adminUsers = ref<User[]>([])
 const adminUsersLoading = ref(false)
 const selectedUserIds = ref<number[]>([])
@@ -2373,6 +2711,225 @@ async function handleDeleteAnnouncement(id: number) {
     console.error('删除失败:', error)
   }
 }
+
+async function fetchBookLists() {
+  bookListsLoading.value = true
+  try {
+    const response = await api.getBookLists({
+      page: bookListsCurrentPage.value,
+      page_size: bookListsPageSize.value,
+      search: bookListSearchQuery.value || undefined,
+      is_active: bookListStatusFilter.value === '' ? undefined : bookListStatusFilter.value
+    })
+    bookLists.value = response.items
+    bookListsTotal.value = response.total
+  } catch (error) {
+    console.error('获取书单列表失败:', error)
+  } finally {
+    bookListsLoading.value = false
+  }
+}
+
+function handleAddBookList() {
+  isBookListEdit.value = false
+  bookListEditingId.value = null
+  resetBookListForm()
+  bookListDialogVisible.value = true
+}
+
+function handleEditBookList(bookList: BookList) {
+  isBookListEdit.value = true
+  bookListEditingId.value = bookList.id
+  Object.assign(bookListForm, {
+    title: bookList.title,
+    description: bookList.description || '',
+    cover_image: bookList.cover_image || '',
+    is_active: bookList.is_active,
+    sort_weight: bookList.sort_weight,
+    category: bookList.category || '',
+    books: []
+  })
+  bookListDialogVisible.value = true
+}
+
+async function handleDeleteBookList(id: number) {
+  try {
+    await api.deleteBookList(id)
+    ElMessage.success('删除成功')
+    fetchBookLists()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function handleBookListSubmit() {
+  if (!bookListFormRef.value) return
+  
+  await bookListFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    bookListSubmitting.value = true
+    try {
+      if (isBookListEdit.value && bookListEditingId.value) {
+        const updateData: BookListUpdate = { ...bookListForm }
+        await api.updateBookList(bookListEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createBookList(bookListForm)
+        ElMessage.success('添加成功')
+      }
+      bookListDialogVisible.value = false
+      fetchBookLists()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      bookListSubmitting.value = false
+    }
+  })
+}
+
+function resetBookListForm() {
+  Object.assign(bookListForm, {
+    title: '',
+    description: '',
+    cover_image: '',
+    is_active: true,
+    sort_weight: 0,
+    category: '',
+    books: []
+  })
+}
+
+function handleBookListCoverError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultBookListCover
+}
+
+function handleBookListFormCoverError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultBookListCover
+}
+
+async function handleManageBooks(bookList: BookList) {
+  currentBookList.value = bookList
+  selectedBookIds.value = []
+  bookSearchOptions.value = []
+  try {
+    currentBookListDetail.value = await api.getBookList(bookList.id)
+    bookListBooksDialogVisible.value = true
+  } catch (error) {
+    console.error('获取书单详情失败:', error)
+  }
+}
+
+async function handleBookSearch(query: string) {
+  if (!query || query.trim() === '') {
+    bookSearchOptions.value = []
+    return
+  }
+  bookSearchLoading.value = true
+  try {
+    const response = await api.getBooks({ search: query.trim(), page_size: 20 })
+    bookSearchOptions.value = response.items
+  } catch (error) {
+    console.error('搜索图书失败:', error)
+  } finally {
+    bookSearchLoading.value = false
+  }
+}
+
+async function handleAddBooksToList() {
+  if (!currentBookList.value || selectedBookIds.value.length === 0) return
+  
+  const existingIds = new Set(currentBookListDetail.value?.books?.map(b => b.id) || [])
+  const newBooks = selectedBookIds.value
+    .filter(id => !existingIds.has(id))
+    .map((id, index) => ({
+      book_id: id,
+      sort_order: (currentBookListDetail.value?.books?.length || 0) + index,
+      recommendation: ''
+    }))
+  
+  if (newBooks.length === 0) {
+    ElMessage.warning('选择的图书已在书单中')
+    return
+  }
+  
+  try {
+    currentBookListDetail.value = await api.addBooksToBookList(currentBookList.value.id, { books: newBooks })
+    ElMessage.success(`成功添加 ${newBooks.length} 本图书`)
+    selectedBookIds.value = []
+  } catch (error) {
+    console.error('添加图书失败:', error)
+  }
+}
+
+async function handleRemoveBook(bookId: number) {
+  if (!currentBookList.value) return
+  
+  try {
+    currentBookListDetail.value = await api.removeBookFromBookList(currentBookList.value.id, bookId)
+    ElMessage.success('移除成功')
+  } catch (error) {
+    console.error('移除图书失败:', error)
+  }
+}
+
+async function handleMoveBookUp(index: number) {
+  if (!currentBookListDetail.value?.books || index === 0) return
+  
+  const books = [...currentBookListDetail.value.books]
+  ;[books[index - 1], books[index]] = [books[index], books[index - 1]]
+  
+  const bookIds = books.map(b => b.id)
+  try {
+    currentBookListDetail.value = await api.reorderBooksInBookList(currentBookList.value!.id, { book_ids: bookIds })
+  } catch (error) {
+    console.error('排序失败:', error)
+  }
+}
+
+async function handleMoveBookDown(index: number) {
+  if (!currentBookListDetail.value?.books || index === currentBookListDetail.value.books.length - 1) return
+  
+  const books = [...currentBookListDetail.value.books]
+  ;[books[index], books[index + 1]] = [books[index + 1], books[index]]
+  
+  const bookIds = books.map(b => b.id)
+  try {
+    currentBookListDetail.value = await api.reorderBooksInBookList(currentBookList.value!.id, { book_ids: bookIds })
+  } catch (error) {
+    console.error('排序失败:', error)
+  }
+}
+
+async function handleUpdateBookRecommendation(book: BookListBook) {
+  if (!currentBookList.value) return
+  
+  try {
+    await api.updateBookInBookList(currentBookList.value.id, book.id, {
+      recommendation: book.recommendation
+    })
+  } catch (error) {
+    console.error('更新推荐语失败:', error)
+  }
+}
+
+function handleBookOptionCoverError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = defaultCover
+}
+
+onMounted(() => {
+  fetchBooks()
+  fetchOrders()
+  fetchCoupons()
+  fetchAuthors()
+  fetchPublishers()
+  fetchAdminMessages()
+  fetchMessageStats()
+  fetchBookLists()
+})
 </script>
 
 <style scoped>
@@ -2696,5 +3253,108 @@ async function handleDeleteAnnouncement(id: number) {
   font-size: 12px;
   color: var(--text-muted);
   margin-left: 4px;
+}
+
+.booklist-thumbnail {
+  width: 50px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.booklist-title {
+  font-weight: 500;
+}
+
+.cover-preview {
+  margin-top: 8px;
+}
+
+.cover-preview img {
+  width: 100px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.book-list-books-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.book-list-books-manager h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.search-select-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.book-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.book-option-cover {
+  width: 32px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.book-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.book-option-title {
+  font-weight: 500;
+}
+
+.book-option-author {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sort-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.book-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.book-item-cover {
+  width: 40px;
+  height: 55px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.book-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.book-item-title {
+  font-weight: 500;
+}
+
+.book-item-author {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>

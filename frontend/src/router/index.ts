@@ -79,6 +79,18 @@ const routes: RouteRecordRaw[] = [
                 meta: { title: '出版社详情' }
             },
             {
+                path: 'book-lists',
+                name: 'BookLists',
+                component: () => import('@/views/BookLists.vue'),
+                meta: { title: '主题书单' }
+            },
+            {
+                path: 'book-lists/:id',
+                name: 'BookListDetail',
+                component: () => import('@/views/BookListDetail.vue'),
+                meta: { title: '书单详情' }
+            },
+            {
                 path: 'messages',
                 name: 'Messages',
                 component: () => import('@/views/Messages.vue'),

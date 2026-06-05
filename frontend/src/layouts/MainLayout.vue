@@ -17,6 +17,10 @@
             <el-icon><Collection /></el-icon>
             <span>图书列表</span>
           </router-link>
+          <router-link to="/book-lists" class="nav-link" active-class="active">
+            <el-icon><Notebook /></el-icon>
+            <span>主题书单</span>
+          </router-link>
           <router-link v-if="userStore.isLoggedIn" to="/coupons" class="nav-link" active-class="active">
             <el-icon><Discount /></el-icon>
             <span>领券中心</span>
@@ -128,7 +132,8 @@ import {
   SwitchButton,
   ShoppingCart,
   Discount,
-  Bell
+  Bell,
+  Notebook
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

@@ -550,3 +550,81 @@ class DashboardResponse(BaseModel):
     recent_orders: List[RecentOrder]
     category_stock: List[CategoryStock]
     sales_trend: List[SalesTrendItem]
+
+
+# ========== 主题书单相关 Schema ==========
+class BookListBookItem(BaseModel):
+    book_id: int = Field(..., description="图书ID")
+    sort_order: int = Field(0, description="排序权重")
+    recommendation: Optional[str] = Field(None, description="推荐语")
+
+
+class BookListBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="书单标题")
+    description: Optional[str] = Field(None, description="书单简介")
+    cover_image: Optional[str] = Field(None, max_length=500, description="封面图片URL")
+    is_active: bool = Field(True, description="展示状态")
+    sort_weight: int = Field(0, description="排序权重")
+    category: Optional[str] = Field(None, max_length=100, description="关联分类")
+
+
+class BookListCreate(BookListBase):
+    books: Optional[List[BookListBookItem]] = Field(None, description="书单包含的图书")
+
+
+class BookListUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200, description="书单标题")
+    description: Optional[str] = Field(None, description="书单简介")
+    cover_image: Optional[str] = Field(None, max_length=500, description="封面图片URL")
+    is_active: Optional[bool] = Field(None, description="展示状态")
+    sort_weight: Optional[int] = Field(None, description="排序权重")
+    category: Optional[str] = Field(None, max_length=100, description="关联分类")
+
+
+class BookListAddBooksRequest(BaseModel):
+    books: List[BookListBookItem] = Field(..., description="要添加的图书列表")
+
+
+class BookListUpdateBookRequest(BaseModel):
+    sort_order: Optional[int] = Field(None, description="排序权重")
+    recommendation: Optional[str] = Field(None, description="推荐语")
+
+
+class BookListReorderRequest(BaseModel):
+    book_ids: List[int] = Field(..., description="按新顺序排列的图书ID列表")
+
+
+class BookListResponse(BookListBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BookListBookResponse(BaseModel):
+    id: int
+    title: str
+    author: str
+    cover_image: Optional[str]
+    price: float
+    category: Optional[str]
+    sort_order: int
+    recommendation: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class BookListDetailResponse(BookListResponse):
+    book_count: int = Field(0, description="图书数量")
+    books: List[BookListBookResponse] = Field([], description="书单内图书列表")
+    categories: List[str] = Field([], description="关联分类列表")
+
+
+class BookListListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[BookListResponse]
