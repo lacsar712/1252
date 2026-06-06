@@ -58,7 +58,7 @@
         <el-card class="items-card">
           <template #header>
             <span class="card-title">商品清单</span>
-            <span class="item-count">共 {{ selectedItems.length }} 件商品</span>
+            <span class="item-count">共 {{ cartStore.selectedCount }} 件商品</span>
           </template>
           <div class="items-list">
             <div

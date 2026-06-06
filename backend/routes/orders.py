@@ -585,6 +585,22 @@ def update_order_admin(
                         detail="发货状态需要填写物流公司和物流单号"
                     )
 
+            if old_status == OrderStatus.PENDING and update_data.status == OrderStatus.CANCELLED:
+                order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                for item in order_items:
+                    book = db.query(Book).filter(Book.id == item.book_id).with_for_update().first()
+                    if book:
+                        book.stock += item.quantity
+                if order.user_coupon_id:
+                    user_coupon = db.query(UserCoupon).filter(
+                        UserCoupon.id == order.user_coupon_id,
+                        UserCoupon.status == UserCouponStatus.USED
+                    ).first()
+                    if user_coupon:
+                        user_coupon.status = UserCouponStatus.UNUSED
+                        user_coupon.order_id = None
+                        user_coupon.used_at = None
+
             order.status = update_data.status
             status_changed = True
             now = datetime.utcnow()
