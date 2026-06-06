@@ -26,7 +26,7 @@
           <el-col :xs="12" :sm="12" :md="6" v-for="card in statCards" :key="card.key">
             <div 
               class="stat-card" 
-              :class="card.type"
+              :class="[card.type, { 'stat-card--disabled': !card.route }]"
               @click="handleCardClick(card)"
             >
               <div class="stat-card-icon">
@@ -43,7 +43,7 @@
                   {{ card.subLabel }}: <span class="sub-value">{{ formatNumber(card.subValue) }}{{ card.suffix }}</span>
                 </div>
               </div>
-              <div class="stat-card-arrow">
+              <div v-if="card.route" class="stat-card-arrow">
                 <el-icon><ArrowRight /></el-icon>
               </div>
             </div>
@@ -245,68 +245,68 @@ const recentOrders = computed<RecentOrder[]>(() => dashboardData.value?.recent_o
 const categoryStockData = computed<CategoryStock[]>(() => dashboardData.value?.category_stock || []);
 const salesTrendData = computed<SalesTrendItem[]>(() => dashboardData.value?.sales_trend || []);
 const statCards = computed(() => [
- {
- key: 'books',
- label: '图书总数',
- value: stats.value.total_books,
- subLabel: '低库存',
- subValue: stats.value.low_stock_count,
- icon: markRaw(Reading),
- type: 'primary',
- route: 'books',
- query: {}
- },
- {
- key: 'users',
- label: '用户总数',
- value: stats.value.total_users,
- icon: markRaw(User),
- type: 'success',
- route: null,
- query: {}
- },
- {
- key: 'orders',
- label: '订单总数',
- value: stats.value.total_orders,
- subLabel: '待处理',
- subValue: stats.value.pending_orders,
- icon: markRaw(ShoppingCart),
- type: 'warning',
- route: 'orders',
- query: {}
- },
- {
- key: 'inventory',
- label: '库存总价值',
- value: stats.value.total_inventory_value,
- prefix: '¥',
- subLabel: '今日销售',
- subValue: stats.value.today_revenue,
- icon: markRaw(Goods),
- type: 'info',
- route: 'books',
- query: {}
- },
- {
- key: 'today_orders',
- label: '今日订单',
- value: stats.value.today_orders,
- icon: markRaw(AlarmClock),
- type: 'purple',
- route: 'orders',
- query: {}
- },
- {
- key: 'today_revenue',
- label: '今日销售额',
- value: stats.value.today_revenue,
- prefix: '¥',
- icon: markRaw(Money),
- type: 'orange',
- route: 'orders',
- query: {}
- }
+  {
+    key: 'books',
+    label: '图书总数',
+    value: stats.value.total_books,
+    subLabel: '低库存',
+    subValue: stats.value.low_stock_count,
+    icon: markRaw(Reading),
+    type: 'primary',
+    route: 'books',
+    query: { low_stock: 1 }
+  },
+  {
+    key: 'users',
+    label: '用户总数',
+    value: stats.value.total_users,
+    icon: markRaw(User),
+    type: 'success',
+    route: null,
+    query: {}
+  },
+  {
+    key: 'orders',
+    label: '订单总数',
+    value: stats.value.total_orders,
+    subLabel: '待处理',
+    subValue: stats.value.pending_orders,
+    icon: markRaw(ShoppingCart),
+    type: 'warning',
+    route: 'orders',
+    query: { status: 'pending,confirmed' }
+  },
+  {
+    key: 'inventory',
+    label: '库存总价值',
+    value: stats.value.total_inventory_value,
+    prefix: '¥',
+    subLabel: '今日销售',
+    subValue: stats.value.today_revenue,
+    icon: markRaw(Goods),
+    type: 'info',
+    route: 'books',
+    query: {}
+  },
+  {
+    key: 'today_orders',
+    label: '今日订单',
+    value: stats.value.today_orders,
+    icon: markRaw(AlarmClock),
+    type: 'purple',
+    route: 'orders',
+    query: {}
+  },
+  {
+    key: 'today_revenue',
+    label: '今日销售额',
+    value: stats.value.today_revenue,
+    prefix: '¥',
+    icon: markRaw(Money),
+    type: 'orange',
+    route: 'orders',
+    query: {}
+  }
 ]);
 const categoryChartOption = computed<EChartsOption>(() => {
  const data = categoryStockData.value.map(item => ({
@@ -641,6 +641,15 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   margin-bottom: 16px;
+}
+
+.stat-card--disabled {
+  cursor: default;
+}
+
+.stat-card--disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .stat-card::before {

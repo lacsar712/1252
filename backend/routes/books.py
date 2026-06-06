@@ -40,9 +40,10 @@ def get_books(
     search: Optional[str] = Query(None, description="搜索关键词（书名或作者）"),
     category: Optional[str] = Query(None, description="分类筛选"),
     tag_id: Optional[int] = Query(None, description="标签ID筛选"),
+    low_stock: Optional[bool] = Query(None, description="只显示低库存图书（库存<10）"),
     db: Session = Depends(get_db)
 ):
-    """获取图书列表（支持分页、搜索、分类和标签筛选）"""
+    """获取图书列表（支持分页、搜索、分类、标签和低库存筛选）"""
     query = db.query(Book)
     
     if search:
@@ -60,6 +61,9 @@ def get_books(
     
     if tag_id:
         query = query.join(book_tag).filter(book_tag.c.tag_id == tag_id)
+
+    if low_stock:
+        query = query.filter(Book.stock < 10)
     
     total = query.count()
     

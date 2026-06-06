@@ -50,6 +50,12 @@
                 </div>
               </el-option>
             </el-select>
+            <el-switch
+              v-model="lowStockFilter"
+              active-text="低库存"
+              inline-prompt
+              @change="fetchBooks"
+            />
             <el-button @click="fetchBooks">搜索</el-button>
           </div>
           
@@ -156,7 +162,10 @@
               v-model="orderStatusFilter"
               placeholder="订单状态"
               clearable
-              style="width: 150px"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              style="min-width: 200px"
               @change="fetchOrders"
             >
               <el-option label="待确认" value="pending" />
@@ -2131,6 +2140,7 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const searchQuery = ref('')
+const lowStockFilter = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
@@ -2142,7 +2152,7 @@ const orders = ref<Order[]>([])
 const ordersTotal = ref(0)
 const ordersCurrentPage = ref(1)
 const ordersPageSize = ref(10)
-const orderStatusFilter = ref<OrderStatus | ''>('')
+const orderStatusFilter = ref<OrderStatus[]>([])
 
 const orderDetailVisible = ref(false)
 const currentOrder = ref<Order | null>(null)
@@ -2422,75 +2432,72 @@ const bookRules: FormRules = {
   price: [{ required: true, message: '请输入价格', trigger: 'blur' }]
 }
 
-onMounted(() => {
-  if (activeTab.value === 'books') {
+function applyRouteFilters() {
+  const q = route.query
+  if (q.low_stock !== undefined) {
+    lowStockFilter.value = ['1', 'true', 'yes'].includes(String(q.low_stock).toLowerCase())
+  }
+  if (q.status !== undefined) {
+    const statusStr = String(q.status)
+    orderStatusFilter.value = statusStr.split(',').map(s => s.trim()).filter(Boolean) as OrderStatus[]
+  } else {
+    orderStatusFilter.value = []
+  }
+}
+
+function loadActiveTabData(force = false) {
+  const tab = activeTab.value
+  if (tab === 'books') {
+    applyRouteFilters()
     fetchBooks()
   }
-  if (activeTab.value === 'orders') {
+  if (tab === 'orders') {
+    applyRouteFilters()
     fetchOrders()
   }
-  if (activeTab.value === 'coupons') {
+  if (tab === 'coupons' && (force || coupons.value.length === 0)) {
     fetchCoupons()
   }
-  if (activeTab.value === 'authors') {
+  if (tab === 'authors' && (force || authors.value.length === 0)) {
     fetchAuthors()
   }
-  if (activeTab.value === 'publishers') {
+  if (tab === 'publishers' && (force || publishers.value.length === 0)) {
     fetchPublishers()
   }
-  if (activeTab.value === 'book-lists') {
+  if (tab === 'book-lists' && (force || bookLists.value.length === 0)) {
     fetchBookLists()
   }
-  if (activeTab.value === 'member-levels') {
+  if (tab === 'member-levels' && (force || memberLevels.value.length === 0)) {
     fetchMemberLevels()
   }
-  if (activeTab.value === 'tags') {
+  if (tab === 'tags' && (force || tags.value.length === 0)) {
     fetchTags()
   }
-  if (activeTab.value === 'messages') {
+  if (tab === 'messages') {
     fetchAdminMessages()
     fetchMessageStats()
+  }
+}
+
+onMounted(() => {
+  loadActiveTabData(true)
+  if (activeTags.value.length === 0) {
+    fetchActiveTags()
   }
 })
 
 watch(
-  () => route.query.tab,
-  (newTab) => {
+  () => [route.query.tab, route.query.low_stock, route.query.status],
+  ([newTab]) => {
     if (newTab && typeof newTab === 'string') {
       activeTab.value = newTab
     }
+    loadActiveTabData(true)
   }
 )
 
-watch(activeTab, (newTab) => {
-  if (newTab === 'books' && books.value.length === 0) {
-    fetchBooks()
-  }
-  if (newTab === 'orders' && orders.value.length === 0) {
-    fetchOrders()
-  }
-  if (newTab === 'coupons' && coupons.value.length === 0) {
-    fetchCoupons()
-  }
-  if (newTab === 'authors' && authors.value.length === 0) {
-    fetchAuthors()
-  }
-  if (newTab === 'publishers' && publishers.value.length === 0) {
-    fetchPublishers()
-  }
-  if (newTab === 'book-lists' && bookLists.value.length === 0) {
-    fetchBookLists()
-  }
-  if (newTab === 'member-levels' && memberLevels.value.length === 0) {
-    fetchMemberLevels()
-  }
-  if (newTab === 'tags' && tags.value.length === 0) {
-    fetchTags()
-  }
-  if (newTab === 'messages') {
-    fetchAdminMessages()
-    fetchMessageStats()
-  }
+watch(activeTab, () => {
+  loadActiveTabData(false)
 })
 
 async function fetchBooks() {
@@ -2500,7 +2507,8 @@ async function fetchBooks() {
       page: currentPage.value,
       page_size: pageSize.value,
       search: searchQuery.value || undefined,
-      tag_id: selectedTagFilter.value || undefined
+      tag_id: selectedTagFilter.value || undefined,
+      low_stock: lowStockFilter.value || undefined
     })
     books.value = response.items
     total.value = response.total
@@ -2514,8 +2522,11 @@ async function fetchBooks() {
 async function fetchOrders() {
   ordersLoading.value = true
   try {
+    const statusStr = orderStatusFilter.value && orderStatusFilter.value.length
+      ? orderStatusFilter.value.join(',')
+      : undefined
     const response = await api.getAllOrders({
-      status: orderStatusFilter.value || undefined,
+      status: statusStr,
       page: ordersCurrentPage.value,
       page_size: ordersPageSize.value
     })
@@ -3679,20 +3690,6 @@ async function handleTagSearch(query: string) {
     tagSearchLoading.value = false
   }
 }
-
-onMounted(() => {
-  fetchBooks()
-  fetchOrders()
-  fetchCoupons()
-  fetchAuthors()
-  fetchPublishers()
-  fetchAdminMessages()
-  fetchMessageStats()
-  fetchBookLists()
-  fetchMemberLevels()
-  fetchTags()
-  fetchActiveTags()
-})
 </script>
 
 <style scoped>

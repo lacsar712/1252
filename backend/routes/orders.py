@@ -528,7 +528,7 @@ def cancel_order(
 # ========== 管理端API ==========
 @router.get("", response_model=OrderListResponse)
 def get_all_orders(
-    status: Optional[str] = Query(None, description="订单状态筛选"),
+    status: Optional[str] = Query(None, description="订单状态筛选（支持多状态，逗号分隔，如 pending,confirmed）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: Session = Depends(get_db),
@@ -539,12 +539,17 @@ def get_all_orders(
 
     if status:
         valid_statuses = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.CANCELLED]
-        if status not in valid_statuses:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"无效的订单状态，有效值为: {', '.join(valid_statuses)}"
-            )
-        query = query.filter(Order.status == status)
+        status_list = [s.strip() for s in status.split(',') if s.strip()]
+        for s in status_list:
+            if s not in valid_statuses:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"无效的订单状态: {s}，有效值为: {', '.join(valid_statuses)}"
+                )
+        if len(status_list) == 1:
+            query = query.filter(Order.status == status_list[0])
+        elif len(status_list) > 1:
+            query = query.filter(Order.status.in_(status_list))
 
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()

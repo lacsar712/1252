@@ -42,7 +42,7 @@ export const api = {
     getCurrentUser: (): Promise<User> =>
         instance.get('/auth/me'),
 
-    getBooks: (params?: { page?: number; page_size?: number; search?: string; category?: string; tag_id?: number }): Promise<BookListResponse> =>
+    getBooks: (params?: { page?: number; page_size?: number; search?: string; category?: string; tag_id?: number; low_stock?: boolean }): Promise<BookListResponse> =>
         instance.get('/books', { params }),
 
     getBook: (id: number): Promise<Book> =>
@@ -102,7 +102,7 @@ export const api = {
     shipOrder: (orderId: number, data: OrderShip): Promise<Order> =>
         instance.post(`/orders/${orderId}/ship`, data),
 
-    getAllOrders: (params?: { status?: OrderStatus; page?: number; page_size?: number }): Promise<OrderListResponse> =>
+    getAllOrders: (params?: { status?: string; page?: number; page_size?: number }): Promise<OrderListResponse> =>
         instance.get('/orders', { params }),
 
     updateOrderAdmin: (orderId: number, data: OrderAdminUpdate): Promise<Order> =>
