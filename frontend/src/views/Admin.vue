@@ -944,7 +944,7 @@
                 <span>{{ row.description || '-' }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="sort_weight" label="排序权重" width="100" />
+            <el-table-column prop="sort_order" label="排序权重" width="100" />
             <el-table-column label="启用状态" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
@@ -2122,9 +2122,9 @@
           />
         </el-form-item>
 
-        <el-form-item label="排序权重" prop="sort_weight">
+        <el-form-item label="排序权重" prop="sort_order">
           <el-input-number
-            v-model="tagForm.sort_weight"
+            v-model="tagForm.sort_order"
             :min="0"
             :max="999"
             controls-position="right"
@@ -2517,7 +2517,7 @@ const tagForm = reactive<TagCreate>({
   name: '',
   color: '#409eff',
   description: '',
-  sort_weight: 0,
+  sort_order: 0,
   is_active: true
 })
 
@@ -3241,9 +3241,7 @@ function handleEdit(book: Book) {
   selectedAuthorIds.value = book.authors ? book.authors.map(a => a.id) : []
   selectedPublisherId.value = book.publisher_id || null
   selectedTagIds.value = book.tags ? book.tags.map(t => t.id) : []
-  if (book.tags && book.tags.length > 0) {
-    tagSearchOptions.value = book.tags
-  }
+  loadAllTagOptions()
   if (book.publisher_id) {
     publisherSearchOptions.value = [{
       id: book.publisher_id,
@@ -3264,7 +3262,7 @@ function handleAdd() {
   selectedPublisherId.value = null
   selectedTagIds.value = []
   publisherSearchOptions.value = []
-  tagSearchOptions.value = []
+  loadAllTagOptions()
   dialogVisible.value = true
 }
 
@@ -3743,7 +3741,7 @@ function handleEditTag(tag: Tag) {
     name: tag.name,
     color: tag.color || '#409eff',
     description: tag.description || '',
-    sort_weight: tag.sort_weight,
+    sort_order: tag.sort_order,
     is_active: tag.is_active
   })
   tagNameError.value = ''
@@ -3822,19 +3820,30 @@ function resetTagForm() {
     name: '',
     color: '#409eff',
     description: '',
-    sort_weight: 0,
+    sort_order: 0,
     is_active: true
   })
 }
 
+async function loadAllTagOptions() {
+  tagSearchLoading.value = true
+  try {
+    tagSearchOptions.value = await api.getAllTags(true)
+  } catch (error) {
+    console.error('加载标签列表失败:', error)
+  } finally {
+    tagSearchLoading.value = false
+  }
+}
+
 async function handleTagSearch(query: string) {
   if (!query || query.trim() === '') {
-    tagSearchOptions.value = []
+    await loadAllTagOptions()
     return
   }
   tagSearchLoading.value = true
   try {
-    tagSearchOptions.value = await api.searchTags(query.trim(), 20, true)
+    tagSearchOptions.value = await api.searchTags(query.trim(), 50, true)
   } catch (error) {
     console.error('搜索标签失败:', error)
   } finally {
