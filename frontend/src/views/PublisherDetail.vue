@@ -104,11 +104,11 @@
         </div>
       </div>
 
-      <div class="publisher-books-section" v-if="publisher.is_active && publisher.books && publisher.books.length > 0">
+      <div class="publisher-books-section" v-if="publisher.is_active && filteredBooks && filteredBooks.length > 0">
         <h2>旗下图书</h2>
         <div class="books-list">
           <el-row :gutter="24">
-            <el-col v-for="book in publisher.books" :key="book.id" :xs="12" :sm="8" :md="6" :lg="4">
+            <el-col v-for="book in filteredBooks" :key="book.id" :xs="12" :sm="8" :md="6" :lg="4">
               <div class="book-card" @click="router.push(`/books/${book.id}`)">
                 <div class="book-cover">
                   <img
@@ -132,7 +132,7 @@
         </div>
       </div>
 
-      <el-empty v-if="publisher.is_active && (!publisher.books || publisher.books.length === 0)" description="暂无相关图书" />
+      <el-empty v-if="publisher.is_active && (!filteredBooks || filteredBooks.length === 0) && (!publisher.recent_books || publisher.recent_books.length === 0)" description="暂无相关图书" />
     </template>
 
     <el-empty v-else-if="!loading" description="出版社不存在" />
@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
 import type { PublisherDetail } from '@/types'
@@ -153,6 +153,12 @@ const loading = ref(false)
 const publisher = ref<PublisherDetail | null>(null)
 const defaultLogo = 'https://via.placeholder.com/200x200/f59e0b/ffffff?text=Publisher'
 const defaultBookCover = 'https://via.placeholder.com/150x200/6366f1/ffffff?text=Book'
+
+const filteredBooks = computed(() => {
+  if (!publisher.value || !publisher.value.books) return []
+  const recentBookIds = new Set((publisher.value.recent_books || []).map(b => b.id))
+  return publisher.value.books.filter(book => !recentBookIds.has(book.id))
+})
 
 onMounted(async () => {
   const publisherId = Number(route.params.id)

@@ -182,15 +182,18 @@ def update_book(
     
     update_data = book_update.model_dump(exclude_unset=True)
     author_ids = update_data.pop('author_ids', None)
-    publisher_id = update_data.pop('publisher_id', None)
     tag_ids = update_data.pop('tag_ids', None)
+    
+    has_publisher_id = 'publisher_id' in update_data
+    publisher_id = update_data.pop('publisher_id', None)
     
     for field, value in update_data.items():
         setattr(db_book, field, value)
     
-    if publisher_id is not None:
-        if publisher_id == 0 or publisher_id is None:
+    if has_publisher_id:
+        if publisher_id is None or publisher_id == 0:
             db_book.publisher_id = None
+            db_book.publisher = None
         else:
             publisher = db.query(Publisher).filter(Publisher.id == publisher_id).first()
             if not publisher:

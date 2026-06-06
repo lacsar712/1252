@@ -3114,11 +3114,15 @@ async function handleSubmit() {
     
     submitting.value = true
     try {
-      const submitData: BookCreate = {
+      const submitData: any = {
         ...bookForm,
         author_ids: selectedAuthorIds.value.length > 0 ? selectedAuthorIds.value : undefined,
-        publisher_id: selectedPublisherId.value || undefined,
         tag_ids: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined
+      }
+      if (isEdit.value) {
+        submitData.publisher_id = selectedPublisherId.value
+      } else {
+        submitData.publisher_id = selectedPublisherId.value || undefined
       }
       if (isEdit.value && editingId.value) {
         await api.updateBook(editingId.value, submitData)
