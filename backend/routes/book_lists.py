@@ -72,7 +72,11 @@ def get_book_list_categories(db: Session = Depends(get_db)):
 
 
 @router.get("/{book_list_id}", response_model=BookListDetailResponse)
-def get_book_list(book_list_id: int, db: Session = Depends(get_db)):
+def get_book_list(
+    book_list_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
     """获取书单详情（包含关联图书、推荐语和排序）"""
     book_list = db.query(BookList).filter(BookList.id == book_list_id).first()
     if not book_list:
@@ -80,6 +84,14 @@ def get_book_list(book_list_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="书单不存在"
         )
+    
+    if not book_list.is_active:
+        is_admin = current_user and current_user.is_admin
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="书单不存在"
+            )
     
     stmt = text("""
         SELECT b.id, b.title, b.author, b.cover_image, b.price, b.category,

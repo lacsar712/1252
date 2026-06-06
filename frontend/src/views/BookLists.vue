@@ -95,8 +95,8 @@
         :page-sizes="[12, 24, 36, 48]"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSearch"
-        @current-change="handleSearch"
+        @size-change="fetchBookLists"
+        @current-change="fetchBookLists"
       />
     </div>
   </div>
