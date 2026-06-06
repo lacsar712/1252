@@ -217,7 +217,7 @@ function handleTagClick(tagId: number) {
   router.push({ name: 'Books', query: { tag_id: tagId } })
 }
 
-async function handleAddToCart(book: Book) {
+async function handleAddToCart() {
   if (!book.value) return
   
   if (!userStore.isLoggedIn) {
@@ -238,6 +238,7 @@ async function handleAddToCart(book: Book) {
   
   const success = await cartStore.addToCart(book.value.id, quantity.value)
   if (success) {
+    ElMessage.success(`已加入购物车，共 ${quantity.value} 本`)
     await cartStore.fetchCartCount()
   }
 }

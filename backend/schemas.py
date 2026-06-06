@@ -313,6 +313,7 @@ class CartListResponse(BaseModel):
     selected_price: float
     invalid_items: List[CartItemInfo]
     low_stock_items: List[CartItemInfo]
+    adjusted_items: List[CartItemInfo] = Field([], description="因库存变化已自动调整数量的商品")
 
 
 # ========== 订单相关 Schema ==========

@@ -25,8 +25,10 @@ export const useCartStore = defineStore('cart', () => {
     const items = computed(() => cartData.value?.items ?? [])
     const invalidItems = computed(() => cartData.value?.invalid_items ?? [])
     const lowStockItems = computed(() => cartData.value?.low_stock_items ?? [])
+    const adjustedItems = computed(() => cartData.value?.adjusted_items ?? [])
     const hasInvalidItems = computed(() => invalidItems.value.length > 0)
     const hasLowStockItems = computed(() => lowStockItems.value.length > 0)
+    const hasAdjustedItems = computed(() => adjustedItems.value.length > 0)
 
     const isAllSelected = computed(() => {
         const validItems = items.value
@@ -76,6 +78,10 @@ export const useCartStore = defineStore('cart', () => {
         try {
             cartData.value = await api.getCart()
             cartCount.value = cartData.value.total_count
+            if (cartData.value.adjusted_items && cartData.value.adjusted_items.length > 0) {
+                const titles = cartData.value.adjusted_items.map(i => i.book?.title || '商品').join('、')
+                ElMessage.warning(`因库存变化，以下商品数量已自动调整：${titles}`)
+            }
         } catch (error) {
             console.error('获取购物车失败:', error)
         } finally {
@@ -89,43 +95,74 @@ export const useCartStore = defineStore('cart', () => {
         const validItems: CartItem[] = []
         const invalidItems: CartItem[] = []
         const lowStockItems: CartItem[] = []
+        const adjustedItems: CartItem[] = []
+        const adjustedTitles: string[] = []
         let totalCount = 0
         let selectedCount = 0
         let totalPrice = 0
         let selectedPrice = 0
+        let guestCartChanged = false
 
-        for (const guestItem of guestCart) {
+        for (let i = 0; i < guestCart.length; i++) {
+            const guestItem = guestCart[i]
             try {
                 const book = await api.getBook(guestItem.book_id)
-                const cartItem: CartItem = {
-                    id: -guestItem.book_id,
-                    user_id: 0,
-                    book_id: guestItem.book_id,
-                    quantity: guestItem.quantity,
-                    selected: guestItem.selected,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    book: book
-                }
-
+                
                 if (book.stock <= 0) {
+                    const cartItem: CartItem = {
+                        id: -guestItem.book_id,
+                        user_id: 0,
+                        book_id: guestItem.book_id,
+                        quantity: guestItem.quantity,
+                        selected: guestItem.selected,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        book: book
+                    }
                     invalidItems.push(cartItem)
                 } else {
+                    let finalQuantity = guestItem.quantity
                     if (guestItem.quantity > book.stock) {
+                        finalQuantity = book.stock
+                        guestCart[i].quantity = finalQuantity
+                        guestCartChanged = true
+                        adjustedTitles.push(book.title || '商品')
+                    }
+                    
+                    const cartItem: CartItem = {
+                        id: -guestItem.book_id,
+                        user_id: 0,
+                        book_id: guestItem.book_id,
+                        quantity: finalQuantity,
+                        selected: guestItem.selected,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        book: book
+                    }
+                    
+                    if (finalQuantity <= 3) {
                         lowStockItems.push(cartItem)
                     }
+                    if (guestItem.quantity !== finalQuantity) {
+                        adjustedItems.push(cartItem)
+                    }
+                    
                     validItems.push(cartItem)
-                    totalCount += guestItem.quantity
-                    totalPrice += guestItem.quantity * book.price
+                    totalCount += finalQuantity
+                    totalPrice += finalQuantity * book.price
                     
                     if (guestItem.selected) {
-                        selectedCount += guestItem.quantity
-                        selectedPrice += guestItem.quantity * book.price
+                        selectedCount += finalQuantity
+                        selectedPrice += finalQuantity * book.price
                     }
                 }
             } catch (error) {
                 console.error('加载购物车商品失败:', error)
             }
+        }
+
+        if (guestCartChanged) {
+            _saveGuestCart(guestCart)
         }
 
         cartData.value = {
@@ -135,9 +172,14 @@ export const useCartStore = defineStore('cart', () => {
             total_price: Math.round(totalPrice * 100) / 100,
             selected_price: Math.round(selectedPrice * 100) / 100,
             invalid_items: invalidItems,
-            low_stock_items: lowStockItems
+            low_stock_items: lowStockItems,
+            adjusted_items: adjustedItems
         }
         cartCount.value = totalCount
+
+        if (adjustedTitles.length > 0) {
+            ElMessage.warning(`因库存变化，以下商品数量已自动调整：${adjustedTitles.join('、')}`)
+        }
     }
 
     async function fetchCartCount() {
@@ -410,8 +452,10 @@ export const useCartStore = defineStore('cart', () => {
         items,
         invalidItems,
         lowStockItems,
+        adjustedItems,
         hasInvalidItems,
         hasLowStockItems,
+        hasAdjustedItems,
         isAllSelected,
         fetchCart,
         fetchCartCount,

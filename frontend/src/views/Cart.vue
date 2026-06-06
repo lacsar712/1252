@@ -246,11 +246,17 @@
               已优惠 ¥{{ memberDiscount.toFixed(2) }}
             </div>
             
+            <div v-if="hasOverStockSelected || hasInvalidSelected" class="checkout-hint">
+              <el-icon class="hint-icon"><WarningFilled /></el-icon>
+              <span v-if="hasOverStockSelected">有商品数量超过库存，请先调整</span>
+              <span v-else-if="hasInvalidSelected">已选商品包含失效商品，请先移除</span>
+            </div>
+            
             <el-button
               type="primary"
               size="large"
               class="checkout-btn"
-              :disabled="cartStore.selectedCount === 0"
+              :disabled="checkoutDisabled"
               @click="handleCheckout"
             >
               结算 ({{ cartStore.selectedCount }})
@@ -302,6 +308,20 @@ const memberDiscount = computed(() => {
 
 const finalPrice = computed(() => {
   return cartStore.selectedPrice - memberDiscount.value
+})
+
+const hasOverStockSelected = computed(() => {
+  return cartStore.items.some(
+    item => item.selected && item.quantity > (item.book?.stock ?? 0)
+  )
+})
+
+const hasInvalidSelected = computed(() => {
+  return cartStore.invalidItems.some(item => item.selected)
+})
+
+const checkoutDisabled = computed(() => {
+  return cartStore.selectedCount === 0 || hasOverStockSelected.value || hasInvalidSelected.value
 })
 
 onMounted(async () => {
@@ -426,6 +446,19 @@ function handleCheckout() {
   }
   if (cartStore.selectedCount === 0) {
     ElMessage.warning('请选择要结算的商品')
+    return
+  }
+  const overStockItems = cartStore.items.filter(
+    item => item.selected && item.quantity > (item.book?.stock ?? 0)
+  )
+  if (overStockItems.length > 0) {
+    const titles = overStockItems.map(i => i.book?.title || '商品').join('、')
+    ElMessage.error(`以下商品数量超过库存，请先调整：${titles}`)
+    return
+  }
+  const selectedInvalid = cartStore.invalidItems.filter(item => item.selected)
+  if (selectedInvalid.length > 0) {
+    ElMessage.warning('已选择的商品中包含失效商品，请先移除失效商品')
     return
   }
   router.push('/checkout')
@@ -698,6 +731,24 @@ function handleCheckout() {
   font-size: 24px;
   font-weight: 700;
   color: var(--danger-color);
+}
+
+.checkout-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #e6a23c;
+}
+
+.checkout-hint .hint-icon {
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .checkout-btn {

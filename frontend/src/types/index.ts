@@ -257,6 +257,7 @@ export interface CartListResponse {
     selected_price: number
     invalid_items: CartItem[]
     low_stock_items: CartItem[]
+    adjusted_items?: CartItem[]
 }
 
 export interface CartItemAdd {

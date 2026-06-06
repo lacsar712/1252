@@ -39,12 +39,13 @@ def _get_cart_item_with_book(db: Session, cart_item: CartItem) -> CartItemInfo:
 
 
 def _validate_cart_items(db: Session, user_id: int):
-    """校验用户购物车所有商品状态，返回分类结果"""
+    """校验用户购物车所有商品状态，返回分类结果，库存不足时自动调整数量"""
     cart_items = db.query(CartItem).filter(CartItem.user_id == user_id).order_by(CartItem.created_at.desc()).all()
     
     valid_items = []
     invalid_items = []
     low_stock_items = []
+    adjusted_items = []
     total_count = 0
     selected_count = 0
     total_price = 0.0
@@ -52,24 +53,45 @@ def _validate_cart_items(db: Session, user_id: int):
     
     for cart_item in cart_items:
         book = db.query(Book).filter(Book.id == cart_item.book_id).first()
-        item_info = CartItemInfo(
-            id=cart_item.id,
-            user_id=cart_item.user_id,
-            book_id=cart_item.book_id,
-            quantity=cart_item.quantity,
-            selected=cart_item.selected,
-            created_at=cart_item.created_at,
-            updated_at=cart_item.updated_at,
-            book=book
-        )
         
         if not book or book.stock <= 0:
+            item_info = CartItemInfo(
+                id=cart_item.id,
+                user_id=cart_item.user_id,
+                book_id=cart_item.book_id,
+                quantity=cart_item.quantity,
+                selected=cart_item.selected,
+                created_at=cart_item.created_at,
+                updated_at=cart_item.updated_at,
+                book=book
+            )
             invalid_items.append(item_info)
         else:
+            adjusted_quantity = False
             if cart_item.quantity > book.stock:
-                low_stock_items.append(item_info)
-            valid_items.append(item_info)
+                cart_item.quantity = book.stock
+                db.commit()
+                db.refresh(cart_item)
+                adjusted_quantity = True
             
+            item_info = CartItemInfo(
+                id=cart_item.id,
+                user_id=cart_item.user_id,
+                book_id=cart_item.book_id,
+                quantity=cart_item.quantity,
+                selected=cart_item.selected,
+                created_at=cart_item.created_at,
+                updated_at=cart_item.updated_at,
+                book=book
+            )
+            
+            if adjusted_quantity:
+                adjusted_items.append(item_info)
+            
+            if cart_item.quantity <= 3:
+                low_stock_items.append(item_info)
+            
+            valid_items.append(item_info)
             total_count += cart_item.quantity
             total_price += cart_item.quantity * book.price
             
@@ -84,7 +106,8 @@ def _validate_cart_items(db: Session, user_id: int):
         total_price=round(total_price, 2),
         selected_price=round(selected_price, 2),
         invalid_items=invalid_items,
-        low_stock_items=low_stock_items
+        low_stock_items=low_stock_items,
+        adjusted_items=adjusted_items
     )
 
 
