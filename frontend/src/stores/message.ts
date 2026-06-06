@@ -61,11 +61,15 @@ export const useMessageStore = defineStore('message', () => {
         try {
             await api.markMessageRead(messageId)
             const message = messages.value.find(m => m.id === messageId)
-            if (message) {
+            if (message && !message.is_read) {
                 message.is_read = true
                 message.read_at = new Date().toISOString()
+                unreadCount.value.total_unread = Math.max(0, unreadCount.value.total_unread - 1)
+                const typeKey = `${message.type}_unread` as keyof UnreadCountResponse
+                if (unreadCount.value[typeKey] !== undefined) {
+                    unreadCount.value[typeKey] = Math.max(0, unreadCount.value[typeKey] - 1)
+                }
             }
-            unreadCount.value.total_unread = Math.max(0, unreadCount.value.total_unread - 1)
         } catch (error) {
             console.error('标记消息已读失败:', error)
         }
@@ -74,10 +78,18 @@ export const useMessageStore = defineStore('message', () => {
     async function markAllAsRead(type?: MessageType) {
         try {
             const response = await api.markAllMessagesRead(type)
+            let updatedCount = 0
             messages.value.forEach(m => {
                 if (!type || m.type === type) {
-                    m.is_read = true
-                    m.read_at = new Date().toISOString()
+                    if (!m.is_read) {
+                        m.is_read = true
+                        m.read_at = new Date().toISOString()
+                        updatedCount++
+                        const typeKey = `${m.type}_unread` as keyof UnreadCountResponse
+                        if (unreadCount.value[typeKey] !== undefined) {
+                            unreadCount.value[typeKey] = Math.max(0, unreadCount.value[typeKey] - 1)
+                        }
+                    }
                 }
             })
             if (!type) {
@@ -86,6 +98,8 @@ export const useMessageStore = defineStore('message', () => {
                 unreadCount.value.delivery_reminder_unread = 0
                 unreadCount.value.announcement_unread = 0
                 unreadCount.value.account_security_unread = 0
+            } else {
+                unreadCount.value.total_unread = Math.max(0, unreadCount.value.total_unread - updatedCount)
             }
             return response
         } catch (error) {
@@ -102,6 +116,10 @@ export const useMessageStore = defineStore('message', () => {
                 const message = messages.value[index]
                 if (!message.is_read) {
                     unreadCount.value.total_unread = Math.max(0, unreadCount.value.total_unread - 1)
+                    const typeKey = `${message.type}_unread` as keyof UnreadCountResponse
+                    if (unreadCount.value[typeKey] !== undefined) {
+                        unreadCount.value[typeKey] = Math.max(0, unreadCount.value[typeKey] - 1)
+                    }
                 }
                 messages.value.splice(index, 1)
                 total.value = Math.max(0, total.value - 1)
@@ -121,6 +139,10 @@ export const useMessageStore = defineStore('message', () => {
                     const message = messages.value[index]
                     if (!message.is_read) {
                         unreadCount.value.total_unread = Math.max(0, unreadCount.value.total_unread - 1)
+                        const typeKey = `${message.type}_unread` as keyof UnreadCountResponse
+                        if (unreadCount.value[typeKey] !== undefined) {
+                            unreadCount.value[typeKey] = Math.max(0, unreadCount.value[typeKey] - 1)
+                        }
                     }
                     messages.value.splice(index, 1)
                     total.value = Math.max(0, total.value - 1)

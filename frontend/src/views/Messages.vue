@@ -97,8 +97,11 @@
             <span class="message-time">{{ formatTime(message.created_at) }}</span>
           </div>
           <div class="message-preview">{{ message.content }}</div>
-          <div class="message-meta" v-if="message.order_no">
-            <span>关联订单：{{ message.order_no }}</span>
+          <div class="message-meta" v-if="message.order_no && message.order_id">
+            <span>关联订单：</span>
+            <el-link type="primary" @click.stop="goToOrderDetail(message.order_id)">
+              {{ message.order_no }}
+            </el-link>
           </div>
         </div>
 
@@ -151,7 +154,12 @@
           <div class="detail-meta">
             <span v-if="currentMessage.sender_name">发送者：{{ currentMessage.sender_name }}</span>
             <span>发送时间：{{ formatTime(currentMessage.created_at) }}</span>
-            <span v-if="currentMessage.order_no">订单号：{{ currentMessage.order_no }}</span>
+            <span v-if="currentMessage.order_no && currentMessage.order_id">
+              订单号：
+              <el-link type="primary" @click="goToOrderDetail(currentMessage.order_id)">
+                {{ currentMessage.order_no }}
+              </el-link>
+            </span>
           </div>
         </div>
         <div class="detail-content">
@@ -235,7 +243,7 @@ const isAllSelected = computed({
 function getMessageIcon(type: MessageType) {
   const iconMap: Record<MessageType, any> = {
     order_status: ShoppingCart,
-    delivery_reminder: Truck,
+    delivery_reminder: Box,
     announcement: BellFilled,
     account_security: UserFilled
   }
@@ -361,6 +369,10 @@ async function handleBatchDelete() {
       console.error('批量删除失败:', error)
     }
   }
+}
+
+function goToOrderDetail(orderId: number) {
+  router.push({ name: 'OrderDetail', params: { id: orderId } })
 }
 
 onMounted(() => {
