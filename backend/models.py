@@ -18,6 +18,31 @@ book_author = Table(
 )
 
 
+book_tag = Table(
+    'book_tag',
+    Base.metadata,
+    Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True),
+    Column('created_at', DateTime, default=datetime.utcnow)
+)
+
+
+class Tag(Base):
+    """标签模型"""
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(50), nullable=False, index=True, unique=True)
+    color = Column(String(20), nullable=True, default="#409eff")
+    description = Column(String(500), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    books = relationship("Book", secondary=book_tag, back_populates="tags")
+
+
 class Publisher(Base):
     """出版社模型"""
     __tablename__ = "publishers"
@@ -110,6 +135,7 @@ class Book(Base):
     authors = relationship("Author", secondary=book_author, back_populates="books")
     publisher_rel = relationship("Publisher", back_populates="books")
     book_lists = relationship("BookList", secondary=book_list_book, back_populates="books")
+    tags = relationship("Tag", secondary=book_tag, back_populates="books")
 
 
 class CartItem(Base):

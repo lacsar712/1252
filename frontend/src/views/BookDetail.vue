@@ -14,8 +14,22 @@
         </div>
         
         <div class="book-info">
-          <div class="book-category" v-if="book.category">
-            <el-tag type="info">{{ book.category }}</el-tag>
+          <div class="book-category-tags">
+            <div class="book-category" v-if="book.category">
+              <el-tag type="info">{{ book.category }}</el-tag>
+            </div>
+            <div class="book-tags-detail" v-if="book.tags && book.tags.length > 0">
+              <el-tag
+                v-for="tag in book.tags"
+                :key="tag.id"
+                :style="{ backgroundColor: tag.color || '#409eff', borderColor: tag.color || '#409eff' }"
+                effect="dark"
+                class="detail-tag"
+                @click="handleTagClick(tag.id)"
+              >
+                {{ tag.name }}
+              </el-tag>
+            </div>
           </div>
           
           <h1 class="book-title">{{ book.title }}</h1>
@@ -199,7 +213,11 @@ function handleImageError(e: Event) {
   img.src = defaultCover
 }
 
-async function handleAddToCart() {
+function handleTagClick(tagId: number) {
+  router.push({ name: 'Books', query: { tag_id: tagId } })
+}
+
+async function handleAddToCart(book: Book) {
   if (!book.value) return
   
   if (!userStore.isLoggedIn) {
@@ -282,8 +300,32 @@ function handleBuyNow() {
   gap: 16px;
 }
 
-.book-category {
+.book-category-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+.book-category {
+  margin-bottom: 0;
+}
+
+.book-tags-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-tag {
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.detail-tag:hover {
+  transform: translateY(-1px);
+  opacity: 0.85;
 }
 
 .book-title {

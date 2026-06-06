@@ -29,6 +29,28 @@
           :value="cat"
         />
       </el-select>
+      <el-select
+        v-model="selectedTagId"
+        placeholder="选择标签"
+        size="large"
+        clearable
+        @change="handleSearch"
+        class="tag-select"
+      >
+        <el-option
+          v-for="tag in activeTags"
+          :key="tag.id"
+          :value="tag.id"
+        >
+          <el-tag
+            :style="{ backgroundColor: tag.color || '#409eff', borderColor: tag.color || '#409eff' }"
+            effect="dark"
+            size="small"
+          >
+            {{ tag.name }}
+          </el-tag>
+        </el-option>
+      </el-select>
       <el-button type="primary" size="large" @click="handleSearch">
         <el-icon><Search /></el-icon>
         搜索
@@ -66,6 +88,19 @@
                 <span v-else class="no-author">暂无作者</span>
               </p>
               <p class="book-publisher" v-if="book.publisher" @click="router.push(`/books/${book.id}`)">{{ book.publisher }}</p>
+              <div class="book-tags" v-if="book.tags && book.tags.length > 0" @click.stop>
+                <el-tag
+                  v-for="tag in book.tags.slice(0, 3)"
+                  :key="tag.id"
+                  :style="{ backgroundColor: tag.color || '#409eff', borderColor: tag.color || '#409eff' }"
+                  effect="dark"
+                  size="small"
+                  class="book-tag"
+                  @click.stop="handleTagClick(tag.id)"
+                >
+                  {{ tag.name }}
+                </el-tag>
+              </div>
               <div class="book-meta">
                 <span class="book-price">¥{{ book.price.toFixed(2) }}</span>
                 <span class="book-stock" :class="{ 'out-of-stock': book.stock === 0 }">
@@ -110,15 +145,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book } from '@/types'
+import type { Book, Tag } from '@/types'
 import { useCartStore } from '@/stores/cart'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { Search, View, ShoppingCart } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const cartStore = useCartStore()
 const userStore = useUserStore()
 
@@ -129,11 +165,17 @@ const currentPage = ref(1)
 const pageSize = ref(12)
 const searchQuery = ref('')
 const selectedCategory = ref('')
+const selectedTagId = ref<number | ''>('')
 const categories = ref<string[]>([])
+const activeTags = ref<Tag[]>([])
 const defaultCover = 'https://via.placeholder.com/200x280/6366f1/ffffff?text=Book'
 
 onMounted(async () => {
-  await Promise.all([fetchBooks(), fetchCategories()])
+  const tagIdFromQuery = route.query.tag_id
+  if (tagIdFromQuery && !isNaN(Number(tagIdFromQuery))) {
+    selectedTagId.value = Number(tagIdFromQuery)
+  }
+  await Promise.all([fetchBooks(), fetchCategories(), fetchActiveTags()])
 })
 
 async function fetchBooks() {
@@ -143,7 +185,8 @@ async function fetchBooks() {
       page: currentPage.value,
       page_size: pageSize.value,
       search: searchQuery.value || undefined,
-      category: selectedCategory.value || undefined
+      category: selectedCategory.value || undefined,
+      tag_id: selectedTagId.value || undefined
     })
     books.value = response.items
     total.value = response.total
@@ -162,9 +205,26 @@ async function fetchCategories() {
   }
 }
 
+async function fetchActiveTags() {
+  try {
+    activeTags.value = await api.getActiveTags()
+  } catch (error) {
+    console.error('获取标签失败:', error)
+  }
+}
+
 function handleSearch() {
   currentPage.value = 1
   fetchBooks()
+}
+
+function handleTagClick(tagId: number) {
+  selectedTagId.value = tagId
+  selectedCategory.value = ''
+  searchQuery.value = ''
+  currentPage.value = 1
+  fetchBooks()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function handleImageError(e: Event) {
@@ -213,6 +273,10 @@ async function handleAddToCart(book: Book) {
 }
 
 .category-select {
+  width: 180px;
+}
+
+.tag-select {
   width: 180px;
 }
 
@@ -310,6 +374,22 @@ async function handleAddToCart(book: Book) {
   font-size: 11px;
   color: var(--text-secondary);
   margin-bottom: 8px;
+}
+
+.book-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.book-tag {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.book-tag:hover {
+  opacity: 0.85;
 }
 
 .book-meta {

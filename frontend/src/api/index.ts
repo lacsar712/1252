@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest, MemberLevel, MemberLevelListResponse, MemberLevelCreate, MemberLevelUpdate, UserMemberLevelInfo, UserMemberLevelUpdate, BookMemberPriceResponse } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest, MemberLevel, MemberLevelListResponse, MemberLevelCreate, MemberLevelUpdate, UserMemberLevelInfo, UserMemberLevelUpdate, BookMemberPriceResponse, Tag, TagListResponse, TagCreate, TagUpdate, TagNameCheckResponse, TagBookCheckResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -42,7 +42,7 @@ export const api = {
     getCurrentUser: (): Promise<User> =>
         instance.get('/auth/me'),
 
-    getBooks: (params?: { page?: number; page_size?: number; search?: string; category?: string }): Promise<BookListResponse> =>
+    getBooks: (params?: { page?: number; page_size?: number; search?: string; category?: string; tag_id?: number }): Promise<BookListResponse> =>
         instance.get('/books', { params }),
 
     getBook: (id: number): Promise<Book> =>
@@ -292,5 +292,38 @@ export const api = {
         instance.get('/member-levels/my'),
 
     getBookMemberPrice: (bookId: number): Promise<BookMemberPriceResponse> =>
-        instance.get(`/member-levels/my/price/${bookId}`)
+        instance.get(`/member-levels/my/price/${bookId}`),
+
+    getTags: (params?: { page?: number; page_size?: number; search?: string; is_active?: boolean }): Promise<TagListResponse> =>
+        instance.get('/tags', { params }),
+
+    getActiveTags: (): Promise<Tag[]> =>
+        instance.get('/tags/active'),
+
+    getAllTags: (include_inactive?: boolean): Promise<Tag[]> =>
+        instance.get('/tags/all', { params: { include_inactive } }),
+
+    searchTags: (keyword: string, limit?: number, include_inactive?: boolean): Promise<Tag[]> =>
+        instance.get('/tags/search', { params: { keyword, limit, include_inactive } }),
+
+    checkTagName: (name: string, exclude_id?: number): Promise<TagNameCheckResponse> =>
+        instance.get('/tags/check-name', { params: { name, exclude_id } }),
+
+    getTag: (tagId: number): Promise<Tag> =>
+        instance.get(`/tags/${tagId}`),
+
+    getTagBooks: (tagId: number, params?: { page?: number; page_size?: number }): Promise<BookListResponse> =>
+        instance.get(`/tags/${tagId}/books`, { params }),
+
+    checkTagDelete: (tagId: number): Promise<TagBookCheckResponse> =>
+        instance.get(`/tags/${tagId}/check-delete`),
+
+    createTag: (tag: TagCreate): Promise<Tag> =>
+        instance.post('/tags', tag),
+
+    updateTag: (tagId: number, tag: TagUpdate): Promise<Tag> =>
+        instance.put(`/tags/${tagId}`, tag),
+
+    deleteTag: (tagId: number): Promise<void> =>
+        instance.delete(`/tags/${tagId}`)
 }

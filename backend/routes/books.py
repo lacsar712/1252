@@ -3,14 +3,14 @@
 图书管理路由
 """
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from database import get_db
-from models import Book, User, Author, Publisher
-from schemas import BookCreate, BookUpdate, BookResponse, BookListResponse, PublisherResponse
+from models import Book, User, Author, Publisher, Tag, book_tag
+from schemas import BookCreate, BookUpdate, BookResponse, BookListResponse, PublisherResponse, BookTagsUpdateRequest
 from auth import get_current_admin_user, get_current_user
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/books", tags=["图书管理"])
 
 
 def _build_book_response(book: Book, db: Session) -> BookResponse:
-    """构建包含出版社信息的图书响应"""
+    """构建包含出版社、作者和标签信息的图书响应"""
     publisher_info = None
     if book.publisher_id:
         publisher = db.query(Publisher).filter(Publisher.id == book.publisher_id).first()
@@ -28,6 +28,7 @@ def _build_book_response(book: Book, db: Session) -> BookResponse:
     book_dict = {c.name: getattr(book, c.name) for c in book.__table__.columns}
     book_dict['authors'] = book.authors
     book_dict['publisher_info'] = publisher_info
+    book_dict['tags'] = book.tags
     
     return BookResponse(**book_dict)
 
@@ -38,9 +39,10 @@ def get_books(
     page_size: int = Query(10, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, description="搜索关键词（书名或作者）"),
     category: Optional[str] = Query(None, description="分类筛选"),
+    tag_id: Optional[int] = Query(None, description="标签ID筛选"),
     db: Session = Depends(get_db)
 ):
-    """获取图书列表（支持分页和搜索）"""
+    """获取图书列表（支持分页、搜索、分类和标签筛选）"""
     query = db.query(Book)
     
     if search:
@@ -55,6 +57,9 @@ def get_books(
     
     if category:
         query = query.filter(Book.category == category)
+    
+    if tag_id:
+        query = query.join(book_tag).filter(book_tag.c.tag_id == tag_id)
     
     total = query.count()
     
@@ -108,6 +113,7 @@ def create_book(
     book_data = book.model_dump()
     author_ids = book_data.pop('author_ids', None)
     publisher_id = book_data.pop('publisher_id', None)
+    tag_ids = book_data.pop('tag_ids', None)
     
     db_book = Book(**book_data)
     
@@ -135,6 +141,22 @@ def create_book(
             )
         db_book.authors = authors
     
+    if tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+        if len(tags) != len(tag_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="部分标签不存在"
+            )
+        inactive_tags = [t for t in tags if not t.is_active]
+        if inactive_tags:
+            inactive_names = "、".join([t.name for t in inactive_tags])
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"标签「{inactive_names}」已被禁用，无法关联"
+            )
+        db_book.tags = tags
+    
     db.add(db_book)
     db.commit()
     db.refresh(db_book)
@@ -161,6 +183,7 @@ def update_book(
     update_data = book_update.model_dump(exclude_unset=True)
     author_ids = update_data.pop('author_ids', None)
     publisher_id = update_data.pop('publisher_id', None)
+    tag_ids = update_data.pop('tag_ids', None)
     
     for field, value in update_data.items():
         setattr(db_book, field, value)
@@ -194,6 +217,25 @@ def update_book(
             db_book.authors = authors
         else:
             db_book.authors = []
+    
+    if tag_ids is not None:
+        if len(tag_ids) > 0:
+            tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+            if len(tags) != len(tag_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="部分标签不存在"
+                )
+            inactive_tags = [t for t in tags if not t.is_active]
+            if inactive_tags:
+                inactive_names = "、".join([t.name for t in inactive_tags])
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"标签「{inactive_names}」已被禁用，无法关联"
+                )
+            db_book.tags = tags
+        else:
+            db_book.tags = []
     
     db.commit()
     db.refresh(db_book)

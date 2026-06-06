@@ -134,6 +134,51 @@ export interface PublisherBookCheckResponse {
     message: string | null
 }
 
+export interface Tag {
+    id: number
+    name: string
+    color: string | null
+    description: string | null
+    sort_order: number
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface TagCreate {
+    name: string
+    color?: string
+    description?: string
+    sort_order: number
+    is_active: boolean
+}
+
+export interface TagUpdate {
+    name?: string
+    color?: string
+    description?: string
+    sort_order?: number
+    is_active?: boolean
+}
+
+export interface TagListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: Tag[]
+}
+
+export interface TagNameCheckResponse {
+    available: boolean
+    message: string | null
+}
+
+export interface TagBookCheckResponse {
+    can_delete: boolean
+    linked_books: number
+    message: string | null
+}
+
 export interface Book {
     id: number
     title: string
@@ -150,6 +195,7 @@ export interface Book {
     updated_at: string
     authors: Author[]
     publisher_info: Publisher | null
+    tags: Tag[]
 }
 
 export interface BookCreate {
@@ -164,6 +210,7 @@ export interface BookCreate {
     cover_image?: string
     category?: string
     author_ids?: number[]
+    tag_ids?: number[]
 }
 
 export interface BookListResponse {

@@ -26,6 +26,30 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
+            <el-select
+              v-model="selectedTagFilter"
+              placeholder="标签筛选"
+              clearable
+              style="width: 200px"
+              @change="fetchBooks"
+            >
+              <el-option
+                v-for="item in activeTags"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              >
+                <div class="tag-option">
+                  <el-tag
+                    :style="{ backgroundColor: item.color || '#409eff', borderColor: item.color || '#409eff' }"
+                    size="small"
+                    effect="dark"
+                  >
+                    {{ item.name }}
+                  </el-tag>
+                </div>
+              </el-option>
+            </el-select>
             <el-button @click="fetchBooks">搜索</el-button>
           </div>
           
@@ -60,6 +84,23 @@
             <el-table-column prop="category" label="分类" width="100">
               <template #default="{ row }">
                 <el-tag v-if="row.category" size="small">{{ row.category }}</el-tag>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="标签" width="200">
+              <template #default="{ row }">
+                <div class="book-tags" v-if="row.tags && row.tags.length > 0">
+                  <el-tag
+                    v-for="tag in row.tags"
+                    :key="tag.id"
+                    :style="{ backgroundColor: tag.color || '#409eff', borderColor: tag.color || '#409eff' }"
+                    size="small"
+                    effect="dark"
+                    style="margin-right: 4px; margin-bottom: 4px;"
+                  >
+                    {{ tag.name }}
+                  </el-tag>
+                </div>
                 <span v-else>-</span>
               </template>
             </el-table-column>
@@ -737,6 +778,97 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane label="标签管理" name="tags">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>标签管理</h1>
+            <el-button type="primary" @click="handleAddTag">
+              <el-icon><Plus /></el-icon>
+              添加标签
+            </el-button>
+          </div>
+          
+          <div class="search-bar">
+            <el-input
+              v-model="tagSearchQuery"
+              placeholder="搜索标签名称/说明..."
+              clearable
+              @keyup.enter="fetchTags"
+              style="max-width: 300px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="tagStatusFilter"
+              placeholder="启用状态"
+              clearable
+              style="width: 150px"
+              @change="fetchTags"
+            >
+              <el-option label="已启用" :value="true" />
+              <el-option label="已停用" :value="false" />
+            </el-select>
+            <el-button @click="fetchTags">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="tags"
+            v-loading="tagsLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column label="标签颜色" width="140">
+              <template #default="{ row }">
+                <span class="color-preview" :style="{ backgroundColor: row.color || '#409eff' }"></span>
+                <span class="color-hex">{{ row.color || '#409eff' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="标签名称" width="140" />
+            <el-table-column prop="description" label="说明" min-width="180">
+              <template #default="{ row }">
+                <span>{{ row.description || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="sort_weight" label="排序权重" width="100" />
+            <el-table-column label="启用状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                  {{ row.is_active ? '已启用' : '已停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="handleEditTag(row)">
+                  编辑
+                </el-button>
+                <el-popconfirm
+                  :title="`确定要删除标签「${row.name}」吗？`"
+                  @confirm="handleDeleteTag(row)"
+                >
+                  <template #reference>
+                    <el-button type="danger" link>删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="tagsCurrentPage"
+              v-model:page-size="tagsPageSize"
+              :total="tagsTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchTags"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane label="消息管理" name="messages">
         <div class="tab-content">
           <div class="admin-header">
@@ -971,6 +1103,39 @@
         
         <el-form-item label="分类" prop="category">
           <el-input v-model="bookForm.category" placeholder="请输入分类" />
+        </el-form-item>
+
+        <el-form-item label="关联标签" prop="tag_ids">
+          <el-select
+            v-model="selectedTagIds"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            placeholder="搜索并选择标签（可多选）"
+            :remote-method="handleTagSearch"
+            :loading="tagSearchLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in tagSearchOptions"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+              :disabled="!item.is_active"
+            >
+              <div class="tag-option">
+                <el-tag
+                  :style="{ backgroundColor: item.color || '#409eff', borderColor: item.color || '#409eff' }"
+                  size="small"
+                  effect="dark"
+                >
+                  {{ item.name }}
+                </el-tag>
+                <el-tag v-if="!item.is_active" size="small" type="info" style="margin-left: 8px;">已禁用</el-tag>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
         
         <el-form-item label="封面" prop="cover_image">
@@ -1762,6 +1927,72 @@
     </el-dialog>
 
     <el-dialog
+      v-model="tagDialogVisible"
+      :title="isTagEdit ? '编辑标签' : '添加标签'"
+      width="600px"
+      destroy-on-close
+    >
+      <el-form
+        ref="tagFormRef"
+        :model="tagForm"
+        :rules="tagRules"
+        label-width="100px"
+      >
+        <el-form-item label="标签名称" prop="name">
+          <el-input
+            v-model="tagForm.name"
+            placeholder="请输入标签名称"
+            maxlength="50"
+            show-word-limit
+            @blur="checkTagNameUnique"
+          />
+          <span v-if="tagNameError" class="error-text">{{ tagNameError }}</span>
+        </el-form-item>
+
+        <el-form-item label="标签颜色" prop="color">
+          <el-color-picker v-model="tagForm.color" />
+          <span class="form-tip">标签显示颜色</span>
+        </el-form-item>
+
+        <el-form-item label="标签说明" prop="description">
+          <el-input
+            v-model="tagForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入标签说明（可选）"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-form-item label="排序权重" prop="sort_weight">
+          <el-input-number
+            v-model="tagForm.sort_weight"
+            :min="0"
+            :max="999"
+            controls-position="right"
+            style="width: 100%"
+          />
+          <span class="form-tip">数值越小排序越靠前</span>
+        </el-form-item>
+
+        <el-form-item label="启用状态" prop="is_active">
+          <el-radio-group v-model="tagForm.is_active">
+            <el-radio :value="true">启用</el-radio>
+            <el-radio :value="false">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="tagDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="tagSubmitting" @click="handleTagSubmit">
+          {{ isTagEdit ? '保存' : '添加' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="announcementDialogVisible"
       title="发布公告"
       width="600px"
@@ -1871,7 +2102,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook, MemberLevel, MemberLevelCreate, MemberLevelUpdate } from '@/types'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook, MemberLevel, MemberLevelCreate, MemberLevelUpdate, Tag, TagCreate, TagUpdate } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, User, Top, Bottom } from '@element-plus/icons-vue'
 import Dashboard from '@/components/Dashboard.vue'
@@ -2110,6 +2341,38 @@ const memberLevelRules: FormRules = {
   sort_order: [{ required: true, message: '请输入排序权重', trigger: 'blur' }]
 }
 
+const tagsLoading = ref(false)
+const tags = ref<Tag[]>([])
+const tagsTotal = ref(0)
+const tagsCurrentPage = ref(1)
+const tagsPageSize = ref(10)
+const tagSearchQuery = ref('')
+const tagStatusFilter = ref<boolean | ''>('')
+const tagDialogVisible = ref(false)
+const isTagEdit = ref(false)
+const tagEditingId = ref<number | null>(null)
+const tagSubmitting = ref(false)
+const tagFormRef = ref<FormInstance>()
+const tagNameError = ref('')
+
+const tagForm = reactive<TagCreate>({
+  name: '',
+  color: '#409eff',
+  description: '',
+  sort_weight: 0,
+  is_active: true
+})
+
+const tagRules: FormRules = {
+  name: [{ required: true, message: '请输入标签名称', trigger: 'blur' }]
+}
+
+const selectedTagIds = ref<number[]>([])
+const tagSearchLoading = ref(false)
+const tagSearchOptions = ref<Tag[]>([])
+const selectedTagFilter = ref<number | null>(null)
+const activeTags = ref<Tag[]>([])
+
 const adminUsers = ref<User[]>([])
 const adminUsersLoading = ref(false)
 const selectedUserIds = ref<number[]>([])
@@ -2168,6 +2431,9 @@ onMounted(() => {
   if (activeTab.value === 'member-levels') {
     fetchMemberLevels()
   }
+  if (activeTab.value === 'tags') {
+    fetchTags()
+  }
   if (activeTab.value === 'messages') {
     fetchAdminMessages()
     fetchMessageStats()
@@ -2205,6 +2471,9 @@ watch(activeTab, (newTab) => {
   if (newTab === 'member-levels' && memberLevels.value.length === 0) {
     fetchMemberLevels()
   }
+  if (newTab === 'tags' && tags.value.length === 0) {
+    fetchTags()
+  }
   if (newTab === 'messages') {
     fetchAdminMessages()
     fetchMessageStats()
@@ -2217,7 +2486,8 @@ async function fetchBooks() {
     const response = await api.getBooks({
       page: currentPage.value,
       page_size: pageSize.value,
-      search: searchQuery.value || undefined
+      search: searchQuery.value || undefined,
+      tag_id: selectedTagFilter.value || undefined
     })
     books.value = response.items
     total.value = response.total
@@ -2795,6 +3065,10 @@ function handleEdit(book: Book) {
   })
   selectedAuthorIds.value = book.authors ? book.authors.map(a => a.id) : []
   selectedPublisherId.value = book.publisher_id || null
+  selectedTagIds.value = book.tags ? book.tags.map(t => t.id) : []
+  if (book.tags && book.tags.length > 0) {
+    tagSearchOptions.value = book.tags
+  }
   if (book.publisher_id) {
     publisherSearchOptions.value = [{
       id: book.publisher_id,
@@ -2813,7 +3087,9 @@ function handleAdd() {
   resetForm()
   selectedAuthorIds.value = []
   selectedPublisherId.value = null
+  selectedTagIds.value = []
   publisherSearchOptions.value = []
+  tagSearchOptions.value = []
   dialogVisible.value = true
 }
 
@@ -2828,7 +3104,8 @@ async function handleSubmit() {
       const submitData: BookCreate = {
         ...bookForm,
         author_ids: selectedAuthorIds.value.length > 0 ? selectedAuthorIds.value : undefined,
-        publisher_id: selectedPublisherId.value || undefined
+        publisher_id: selectedPublisherId.value || undefined,
+        tag_ids: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined
       }
       if (isEdit.value && editingId.value) {
         await api.updateBook(editingId.value, submitData)
@@ -3246,6 +3523,146 @@ function resetMemberLevelForm() {
   })
 }
 
+async function fetchTags() {
+  tagsLoading.value = true
+  try {
+    const response = await api.getTags({
+      page: tagsCurrentPage.value,
+      page_size: tagsPageSize.value,
+      search: tagSearchQuery.value || undefined,
+      is_active: tagStatusFilter.value === '' ? undefined : tagStatusFilter.value
+    })
+    tags.value = response.items
+    tagsTotal.value = response.total
+  } catch (error) {
+    console.error('获取标签列表失败:', error)
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
+async function fetchActiveTags() {
+  try {
+    activeTags.value = await api.getActiveTags()
+  } catch (error) {
+    console.error('获取启用标签失败:', error)
+  }
+}
+
+function handleAddTag() {
+  isTagEdit.value = false
+  tagEditingId.value = null
+  resetTagForm()
+  tagNameError.value = ''
+  tagDialogVisible.value = true
+}
+
+function handleEditTag(tag: Tag) {
+  isTagEdit.value = true
+  tagEditingId.value = tag.id
+  Object.assign(tagForm, {
+    name: tag.name,
+    color: tag.color || '#409eff',
+    description: tag.description || '',
+    sort_weight: tag.sort_weight,
+    is_active: tag.is_active
+  })
+  tagNameError.value = ''
+  tagDialogVisible.value = true
+}
+
+async function handleDeleteTag(tag: Tag) {
+  try {
+    const checkResult = await api.checkTagDelete(tag.id)
+    if (!checkResult.can_delete) {
+      ElMessage.warning(checkResult.message || '该标签有关联的图书，无法删除')
+      return
+    }
+    await api.deleteTag(tag.id)
+    ElMessage.success('删除成功')
+    fetchTags()
+  } catch (error) {
+    console.error('删除失败:', error)
+  }
+}
+
+async function checkTagNameUnique() {
+  if (!tagForm.name || tagForm.name.trim() === '') {
+    tagNameError.value = ''
+    return
+  }
+  try {
+    const result = await api.checkTagName(
+      tagForm.name.trim(),
+      isTagEdit.value && tagEditingId.value ? tagEditingId.value : undefined
+    )
+    if (!result.available) {
+      tagNameError.value = result.message || '名称已存在'
+    } else {
+      tagNameError.value = ''
+    }
+  } catch (error) {
+    console.error('校验名称失败:', error)
+  }
+}
+
+async function handleTagSubmit() {
+  if (!tagFormRef.value) return
+  
+  await tagFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    if (tagNameError.value) {
+      ElMessage.error(tagNameError.value)
+      return
+    }
+    
+    tagSubmitting.value = true
+    try {
+      if (isTagEdit.value && tagEditingId.value) {
+        const updateData: TagUpdate = { ...tagForm }
+        await api.updateTag(tagEditingId.value, updateData)
+        ElMessage.success('更新成功')
+      } else {
+        await api.createTag(tagForm)
+        ElMessage.success('添加成功')
+      }
+      tagDialogVisible.value = false
+      fetchTags()
+      fetchActiveTags()
+    } catch (error) {
+      console.error('操作失败:', error)
+    } finally {
+      tagSubmitting.value = false
+    }
+  })
+}
+
+function resetTagForm() {
+  Object.assign(tagForm, {
+    name: '',
+    color: '#409eff',
+    description: '',
+    sort_weight: 0,
+    is_active: true
+  })
+}
+
+async function handleTagSearch(query: string) {
+  if (!query || query.trim() === '') {
+    tagSearchOptions.value = []
+    return
+  }
+  tagSearchLoading.value = true
+  try {
+    tagSearchOptions.value = await api.searchTags(query.trim(), 20, true)
+  } catch (error) {
+    console.error('搜索标签失败:', error)
+  } finally {
+    tagSearchLoading.value = false
+  }
+}
+
 onMounted(() => {
   fetchBooks()
   fetchOrders()
@@ -3256,6 +3673,8 @@ onMounted(() => {
   fetchMessageStats()
   fetchBookLists()
   fetchMemberLevels()
+  fetchTags()
+  fetchActiveTags()
 })
 </script>
 
@@ -3704,5 +4123,16 @@ onMounted(() => {
   font-size: 12px;
   color: var(--text-secondary);
   vertical-align: middle;
+}
+
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.book-tags {
+  display: flex;
+  flex-wrap: wrap;
 }
 </style>
