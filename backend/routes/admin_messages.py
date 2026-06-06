@@ -18,7 +18,7 @@ from schemas import (
     MessageResponse,
     MessageListResponse,
     AnnouncementCreate,
-    User as UserSchema
+    UserResponse as UserSchema
 )
 from auth import get_current_admin_user
 from message_service import send_announcement

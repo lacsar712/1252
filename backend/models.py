@@ -26,6 +26,16 @@ book_tag = Table(
     Column('created_at', DateTime, default=datetime.utcnow)
 )
 
+book_list_book = Table(
+    'book_list_book',
+    Base.metadata,
+    Column('book_list_id', Integer, ForeignKey('book_lists.id'), primary_key=True),
+    Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
+    Column('sort_order', Integer, default=0, nullable=False),
+    Column('recommendation', Text, nullable=True),
+    Column('created_at', DateTime, default=datetime.utcnow)
+)
+
 
 class Tag(Base):
     """标签模型"""
@@ -58,7 +68,7 @@ class Publisher(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    books = relationship("Book", back_populates="publisher")
+    books = relationship("Book", back_populates="publisher_rel")
 
 
 class Author(Base):
@@ -322,17 +332,6 @@ class MessageRecipient(Base):
     user = relationship("User")
 
 
-book_list_book = Table(
-    'book_list_book',
-    Base.metadata,
-    Column('book_list_id', Integer, ForeignKey('book_lists.id'), primary_key=True),
-    Column('book_id', Integer, ForeignKey('books.id'), primary_key=True),
-    Column('sort_order', Integer, default=0, nullable=False),
-    Column('recommendation', Text, nullable=True),
-    Column('created_at', DateTime, default=datetime.utcnow)
-)
-
-
 class BookList(Base):
     """主题书单模型"""
     __tablename__ = "book_lists"
@@ -348,11 +347,3 @@ class BookList(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     books = relationship("Book", secondary=book_list_book, back_populates="book_lists", order_by="book_list_book.c.sort_order")
-
-
-class BookListBookAssociation(Base):
-    """书单图书关联模型（用于操作排序和推荐语）"""
-    __table__ = book_list_book
-
-    book_list = relationship("BookList", backref="book_associations")
-    book = relationship("Book", backref="list_associations")

@@ -11,7 +11,7 @@ from sqlalchemy import or_, func, text
 from database import get_db
 from models import BookList, Book, User, book_list_book
 from schemas import (
-    BookListCreate, BookListUpdate, BookListResponse, BookListListResponse,
+    BookListCreate, BookListUpdate, ThemeBookListResponse, BookListListResponse,
     BookListDetailResponse, BookListAddBooksRequest, BookListUpdateBookRequest,
     BookListBookResponse, BookListReorderRequest
 )
@@ -124,7 +124,7 @@ def get_book_list(book_list_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.post("", response_model=BookListResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ThemeBookListResponse, status_code=status.HTTP_201_CREATED)
 def create_book_list(
     book_list_data: BookListCreate,
     db: Session = Depends(get_db),
@@ -178,7 +178,7 @@ def create_book_list(
     return db_book_list
 
 
-@router.put("/{book_list_id}", response_model=BookListResponse)
+@router.put("/{book_list_id}", response_model=ThemeBookListResponse)
 def update_book_list(
     book_list_id: int,
     book_list_update: BookListUpdate,

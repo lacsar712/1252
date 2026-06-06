@@ -6,10 +6,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./bookstore.db
+      - DATABASE_URL=sqlite:///./data/bookstore.db
       - SECRET_KEY=bookstore-secret-key-2024-very-secure
     volumes:
-      - backend-data:/app
+      - backend-data:/app/data
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]

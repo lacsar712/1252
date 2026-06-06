@@ -2,6 +2,8 @@
 """
 Pydantic 数据模式定义
 """
+from __future__ import annotations
+
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
@@ -60,103 +62,6 @@ class AuthorBookCheckResponse(BaseModel):
     can_delete: bool = Field(..., description="是否可以删除")
     linked_books: int = Field(0, description="关联图书数量")
     message: Optional[str] = Field(None, description="提示信息")
-
-
-# ========== 用户相关 Schema ==========
-class UserBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
-
-
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=6, max_length=100)
-
-
-class UserLogin(BaseModel):
-    username: str
-    password: str
-
-
-class UserResponse(UserBase):
-    id: int
-    is_active: bool
-    is_admin: bool
-    total_spent: float = 0.0
-    manual_level_id: Optional[int] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class UserMemberResponse(UserResponse):
-    member_level: Optional[UserMemberLevelInfo] = None
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-    user_id: Optional[int] = None
-
-
-# ========== 图书相关 Schema ==========
-class BookBase(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    author: str = Field(..., min_length=1, max_length=100)
-    publisher: Optional[str] = Field(None, max_length=100)
-    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
-    isbn: Optional[str] = Field(None, max_length=20)
-    price: float = Field(..., gt=0)
-    stock: int = Field(default=0, ge=0)
-    description: Optional[str] = None
-    cover_image: Optional[str] = None
-    category: Optional[str] = None
-
-
-class BookCreate(BookBase):
-    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
-    tag_ids: Optional[List[int]] = Field(None, description="关联标签ID列表")
-
-
-class BookUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    author: Optional[str] = Field(None, min_length=1, max_length=100)
-    publisher: Optional[str] = Field(None, max_length=100)
-    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
-    isbn: Optional[str] = Field(None, max_length=20)
-    price: Optional[float] = Field(None, gt=0)
-    stock: Optional[int] = Field(None, ge=0)
-    description: Optional[str] = None
-    cover_image: Optional[str] = None
-    category: Optional[str] = None
-    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
-    tag_ids: Optional[List[int]] = Field(None, description="关联标签ID列表")
-
-
-class BookResponse(BookBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    authors: List[AuthorResponse] = Field([], description="关联作者列表")
-    publisher_info: Optional[PublisherResponse] = Field(None, description="关联出版社信息")
-    tags: List["TagResponse"] = Field([], description="关联标签列表")
-
-    class Config:
-        from_attributes = True
-
-
-class BookListResponse(BaseModel):
-    total: int
-    page: int
-    page_size: int
-    items: List[BookResponse]
-
-
-AuthorDetailResponse.model_rebuild()
 
 
 # ========== 出版社相关 Schema ==========
@@ -226,7 +131,146 @@ class PublisherBookCheckResponse(BaseModel):
     message: Optional[str] = Field(None, description="提示信息")
 
 
-PublisherDetailResponse.model_rebuild()
+# ========== 标签相关 Schema ==========
+class TagBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50, description="标签名称")
+    color: Optional[str] = Field("#409eff", max_length=20, description="标签颜色")
+    description: Optional[str] = Field(None, max_length=500, description="标签说明")
+    sort_order: int = Field(0, ge=0, description="排序权重")
+    is_active: bool = Field(True, description="启用状态")
+
+
+class TagCreate(TagBase):
+    pass
+
+
+class TagUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=50, description="标签名称")
+    color: Optional[str] = Field(None, max_length=20, description="标签颜色")
+    description: Optional[str] = Field(None, max_length=500, description="标签说明")
+    sort_order: Optional[int] = Field(None, ge=0, description="排序权重")
+    is_active: Optional[bool] = Field(None, description="启用状态")
+
+
+class TagResponse(TagBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TagListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[TagResponse]
+
+
+class TagNameCheckResponse(BaseModel):
+    available: bool = Field(..., description="名称是否可用")
+    message: Optional[str] = Field(None, description="提示信息")
+
+
+class TagBookCheckResponse(BaseModel):
+    can_delete: bool = Field(..., description="是否可以删除")
+    linked_books: int = Field(0, description="关联图书数量")
+    message: Optional[str] = Field(None, description="提示信息")
+
+
+class BookTagsUpdateRequest(BaseModel):
+    tag_ids: List[int] = Field(..., description="标签ID列表")
+
+
+# ========== 用户相关 Schema ==========
+class UserBase(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=6, max_length=100)
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class UserResponse(UserBase):
+    id: int
+    is_active: bool
+    is_admin: bool
+    total_spent: float = 0.0
+    manual_level_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    user_id: Optional[int] = None
+
+
+# ========== 图书相关 Schema ==========
+class BookBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    author: str = Field(..., min_length=1, max_length=100)
+    publisher: Optional[str] = Field(None, max_length=100)
+    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
+    isbn: Optional[str] = Field(None, max_length=20)
+    price: float = Field(..., gt=0)
+    stock: int = Field(default=0, ge=0)
+    description: Optional[str] = None
+    cover_image: Optional[str] = None
+    category: Optional[str] = None
+
+
+class BookCreate(BookBase):
+    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
+    tag_ids: Optional[List[int]] = Field(None, description="关联标签ID列表")
+
+
+class BookUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    author: Optional[str] = Field(None, min_length=1, max_length=100)
+    publisher: Optional[str] = Field(None, max_length=100)
+    publisher_id: Optional[int] = Field(None, description="关联出版社ID")
+    isbn: Optional[str] = Field(None, max_length=20)
+    price: Optional[float] = Field(None, gt=0)
+    stock: Optional[int] = Field(None, ge=0)
+    description: Optional[str] = None
+    cover_image: Optional[str] = None
+    category: Optional[str] = None
+    author_ids: Optional[List[int]] = Field(None, description="关联作者ID列表")
+    tag_ids: Optional[List[int]] = Field(None, description="关联标签ID列表")
+
+
+class BookResponse(BookBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    authors: List[AuthorResponse] = Field([], description="关联作者列表")
+    publisher_info: Optional[PublisherResponse] = Field(None, description="关联出版社信息")
+    tags: List["TagResponse"] = Field([], description="关联标签列表")
+
+    class Config:
+        from_attributes = True
+
+
+class BookListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[BookResponse]
 
 
 # ========== 购物车相关 Schema ==========
@@ -442,9 +486,6 @@ class OrderCreateWithCoupon(OrderCreate):
     user_coupon_id: Optional[int] = Field(None, description="用户优惠券ID")
 
 
-OrderResponse.model_rebuild()
-
-
 # ========== 消息相关 Schema ==========
 class MessageBase(BaseModel):
     type: str = Field(..., description="消息类型")
@@ -609,7 +650,7 @@ class BookListReorderRequest(BaseModel):
     book_ids: List[int] = Field(..., description="按新顺序排列的图书ID列表")
 
 
-class BookListResponse(BookListBase):
+class ThemeBookListResponse(BookListBase):
     id: int
     created_at: datetime
     updated_at: datetime
@@ -632,7 +673,7 @@ class BookListBookResponse(BaseModel):
         from_attributes = True
 
 
-class BookListDetailResponse(BookListResponse):
+class BookListDetailResponse(ThemeBookListResponse):
     book_count: int = Field(0, description="图书数量")
     books: List[BookListBookResponse] = Field([], description="书单内图书列表")
     categories: List[str] = Field([], description="关联分类列表")
@@ -642,7 +683,7 @@ class BookListListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    items: List[BookListResponse]
+    items: List[ThemeBookListResponse]
 
 
 # ========== 会员等级相关 Schema ==========
@@ -698,6 +739,10 @@ class UserMemberLevelInfo(BaseModel):
     is_manual: bool = Field(False, description="是否为管理员手动设置等级")
 
 
+class UserMemberResponse(UserResponse):
+    member_level: Optional[UserMemberLevelInfo] = None
+
+
 class UserMemberLevelUpdate(BaseModel):
     manual_level_id: Optional[int] = Field(None, description="手动设置的会员等级ID，传null则清除手动设置")
 
@@ -722,56 +767,7 @@ class OrderPriceBreakdown(BaseModel):
     member_level_name: Optional[str] = None
 
 
-# ========== 标签相关 Schema ==========
-class TagBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=50, description="标签名称")
-    color: Optional[str] = Field("#409eff", max_length=20, description="标签颜色")
-    description: Optional[str] = Field(None, max_length=500, description="标签说明")
-    sort_order: int = Field(0, ge=0, description="排序权重")
-    is_active: bool = Field(True, description="启用状态")
-
-
-class TagCreate(TagBase):
-    pass
-
-
-class TagUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=50, description="标签名称")
-    color: Optional[str] = Field(None, max_length=20, description="标签颜色")
-    description: Optional[str] = Field(None, max_length=500, description="标签说明")
-    sort_order: Optional[int] = Field(None, ge=0, description="排序权重")
-    is_active: Optional[bool] = Field(None, description="启用状态")
-
-
-class TagResponse(TagBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class TagListResponse(BaseModel):
-    total: int
-    page: int
-    page_size: int
-    items: List[TagResponse]
-
-
-class TagNameCheckResponse(BaseModel):
-    available: bool = Field(..., description="名称是否可用")
-    message: Optional[str] = Field(None, description="提示信息")
-
-
-class TagBookCheckResponse(BaseModel):
-    can_delete: bool = Field(..., description="是否可以删除")
-    linked_books: int = Field(0, description="关联图书数量")
-    message: Optional[str] = Field(None, description="提示信息")
-
-
-class BookTagsUpdateRequest(BaseModel):
-    tag_ids: List[int] = Field(..., description="标签ID列表")
-
-
-BookResponse.model_rebuild()
+AuthorDetailResponse.model_rebuild()
+PublisherDetailResponse.model_rebuild()
+OrderResponse.model_rebuild()
+UserMemberResponse.model_rebuild()
