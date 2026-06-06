@@ -679,6 +679,17 @@ export interface UserMemberLevelUpdate {
     manual_level_id?: number | null
 }
 
+export interface UserMemberResponse extends User {
+    member_level: UserMemberLevelInfo | null
+}
+
+export interface UserMemberListResponse {
+    total: number
+    page: number
+    page_size: number
+    items: UserMemberResponse[]
+}
+
 export interface MemberPriceInfo {
     original_price: number
     member_price: number

@@ -25,6 +25,10 @@
             <el-icon><Notebook /></el-icon>
             <span>主题书单</span>
           </router-link>
+          <router-link v-if="userStore.isLoggedIn" to="/member" class="nav-link" active-class="active">
+            <el-icon><Medal /></el-icon>
+            <span>会员中心</span>
+          </router-link>
           <router-link v-if="userStore.isLoggedIn" to="/coupons" class="nav-link" active-class="active">
             <el-icon><Discount /></el-icon>
             <span>领券中心</span>
@@ -77,6 +81,10 @@
                       :value="messageStore.unreadCount.total_unread" 
                       class="inline-badge"
                     />
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/member')">
+                    <el-icon><Medal /></el-icon>
+                    会员中心
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/coupons')">
                     <el-icon><Discount /></el-icon>
@@ -138,7 +146,8 @@ import {
   ShoppingCart,
   Discount,
   Bell,
-  Notebook
+  Notebook,
+  Medal
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

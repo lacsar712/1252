@@ -745,6 +745,13 @@ class UserMemberResponse(UserResponse):
     member_level: Optional[UserMemberLevelInfo] = None
 
 
+class UserMemberListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[UserMemberResponse]
+
+
 class UserMemberLevelUpdate(BaseModel):
     manual_level_id: Optional[int] = Field(None, description="手动设置的会员等级ID，传null则清除手动设置")
 

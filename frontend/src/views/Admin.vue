@@ -787,6 +787,109 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane label="用户管理" name="member-users">
+        <div class="tab-content">
+          <div class="admin-header">
+            <h1>用户管理</h1>
+          </div>
+          
+          <div class="search-bar">
+            <el-input
+              v-model="memberUserSearchQuery"
+              placeholder="搜索用户名或邮箱..."
+              clearable
+              @keyup.enter="fetchMemberUsers"
+              style="max-width: 300px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button @click="fetchMemberUsers">搜索</el-button>
+          </div>
+          
+          <el-table
+            :data="memberUsers"
+            v-loading="memberUsersLoading"
+            stripe
+            style="width: 100%"
+          >
+            <el-table-column prop="id" label="用户ID" width="80" />
+            <el-table-column prop="username" label="用户名" width="120" />
+            <el-table-column prop="email" label="邮箱" min-width="180" />
+            <el-table-column label="累计消费" width="120">
+              <template #default="{ row }">
+                <span class="price">¥{{ row.total_spent.toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="会员等级" width="120">
+              <template #default="{ row }">
+                <el-tag
+                  v-if="row.member_level?.current_level"
+                  :style="{ backgroundColor: row.member_level.current_level.badge_color || '#409eff', borderColor: row.member_level.current_level.badge_color || '#409eff' }"
+                  size="small"
+                  effect="dark"
+                >
+                  {{ row.member_level.current_level.name }}
+                </el-tag>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="等级来源" width="100">
+              <template #default="{ row }">
+                <el-tag
+                  v-if="row.member_level?.is_manual"
+                  type="warning"
+                  size="small"
+                >
+                  手动
+                </el-tag>
+                <el-tag
+                  v-else
+                  type="success"
+                  size="small"
+                >
+                  自动
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="注册时间" width="180">
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="300" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="openAdjustLevelDialog(row)">
+                  调整等级
+                </el-button>
+                <el-button
+                  v-if="row.member_level?.is_manual"
+                  link
+                  type="warning"
+                  @click="handleClearManualLevel(row)"
+                >
+                  清除手动等级
+                </el-button>
+                <el-button link type="info" @click="handleRecalculateUserSpent(row)">
+                  重新计算累计消费
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="memberUsersCurrentPage"
+              v-model:page-size="memberUsersPageSize"
+              :total="memberUsersTotal"
+              layout="total, prev, pager, next"
+              @current-change="fetchMemberUsers"
+            />
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane label="标签管理" name="tags">
         <div class="tab-content">
           <div class="admin-header">
@@ -1949,6 +2052,38 @@
     </el-dialog>
 
     <el-dialog
+      v-model="adjustLevelDialogVisible"
+      :title="`调整用户等级 - ${adjustingUserName}`"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form label-width="100px">
+        <el-form-item label="选择等级">
+          <el-select
+            v-model="selectedLevelId"
+            placeholder="请选择会员等级"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="level in allActiveMemberLevels"
+              :key="level.id"
+              :label="`${level.name} - 门槛¥${level.threshold_amount.toFixed(2)} - ${(level.discount_rate * 10).toFixed(1)}折`"
+              :value="level.id"
+            />
+          </el-select>
+          <span class="form-tip">设置后用户将按此等级享受折扣，不受累计消费影响</span>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="adjustLevelDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="selectedLevelId === null" @click="handleAdjustLevel">
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="tagDialogVisible"
       :title="isTagEdit ? '编辑标签' : '添加标签'"
       width="600px"
@@ -2124,8 +2259,8 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api'
-import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook, MemberLevel, MemberLevelCreate, MemberLevelUpdate, Tag, TagCreate, TagUpdate } from '@/types'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import type { Book, BookCreate, Order, OrderStatus, Coupon, CouponCreate, CouponUpdate, CouponStatus as CouponStatusType, Author, AuthorCreate, AuthorUpdate, AuthorSearchResult, Publisher, PublisherCreate, PublisherUpdate, PublisherSearchResult, Message, MessageType, MessageRecipientType, AnnouncementCreate, MessageStatsResponse, BookList, BookListCreate, BookListUpdate, BookListDetail, BookListBook, MemberLevel, MemberLevelCreate, MemberLevelUpdate, Tag, TagCreate, TagUpdate, UserMemberResponse, UserMemberListResponse, UserMemberLevelUpdate } from '@/types'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, User, Top, Bottom } from '@element-plus/icons-vue'
 import Dashboard from '@/components/Dashboard.vue'
 
@@ -2396,6 +2531,18 @@ const tagSearchOptions = ref<Tag[]>([])
 const selectedTagFilter = ref<number | null>(null)
 const activeTags = ref<Tag[]>([])
 
+const memberUsersLoading = ref(false)
+const memberUsers = ref<UserMemberResponse[]>([])
+const memberUsersTotal = ref(0)
+const memberUsersCurrentPage = ref(1)
+const memberUsersPageSize = ref(10)
+const memberUserSearchQuery = ref('')
+const adjustLevelDialogVisible = ref(false)
+const adjustingUserId = ref<number | null>(null)
+const adjustingUserName = ref('')
+const selectedLevelId = ref<number | null>(null)
+const allActiveMemberLevels = ref<MemberLevel[]>([])
+
 const adminUsers = ref<User[]>([])
 const adminUsersLoading = ref(false)
 const selectedUserIds = ref<number[]>([])
@@ -2469,6 +2616,10 @@ function loadActiveTabData(force = false) {
   }
   if (tab === 'member-levels' && (force || memberLevels.value.length === 0)) {
     fetchMemberLevels()
+  }
+  if (tab === 'member-users' && (force || memberUsers.value.length === 0)) {
+    fetchMemberUsers()
+    fetchAllActiveMemberLevels()
   }
   if (tab === 'tags' && (force || tags.value.length === 0)) {
     fetchTags()
@@ -3688,6 +3839,95 @@ async function handleTagSearch(query: string) {
     console.error('搜索标签失败:', error)
   } finally {
     tagSearchLoading.value = false
+  }
+}
+
+async function fetchMemberUsers() {
+  memberUsersLoading.value = true
+  try {
+    const response = await api.getAdminMemberUsers({
+      search: memberUserSearchQuery.value || undefined,
+      page: memberUsersCurrentPage.value,
+      page_size: memberUsersPageSize.value
+    })
+    memberUsers.value = response.items
+    memberUsersTotal.value = response.total
+  } catch (error) {
+    console.error('获取用户列表失败:', error)
+  } finally {
+    memberUsersLoading.value = false
+  }
+}
+
+async function fetchAllActiveMemberLevels() {
+  try {
+    allActiveMemberLevels.value = await api.getAdminAllActiveMemberLevels()
+  } catch (error) {
+    console.error('获取启用等级列表失败:', error)
+  }
+}
+
+function openAdjustLevelDialog(user: UserMemberResponse) {
+  adjustingUserId.value = user.id
+  adjustingUserName.value = user.username
+  selectedLevelId.value = user.member_level?.manual_level?.id || null
+  adjustLevelDialogVisible.value = true
+}
+
+async function handleAdjustLevel() {
+  if (!adjustingUserId.value || selectedLevelId.value === null) return
+
+  try {
+    const updateData: UserMemberLevelUpdate = { manual_level_id: selectedLevelId.value }
+    await api.updateUserMemberLevel(adjustingUserId.value, updateData)
+    ElMessage.success('等级调整成功')
+    adjustLevelDialogVisible.value = false
+    fetchMemberUsers()
+  } catch (error) {
+    console.error('调整等级失败:', error)
+  }
+}
+
+async function handleClearManualLevel(user: UserMemberResponse) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要清除用户「${user.username}」的手动等级吗？清除后将按累计消费自动计算等级。`,
+      '清除手动等级',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    const updateData: UserMemberLevelUpdate = { manual_level_id: null }
+    await api.updateUserMemberLevel(user.id, updateData)
+    ElMessage.success('已清除手动等级')
+    fetchMemberUsers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('清除手动等级失败:', error)
+    }
+  }
+}
+
+async function handleRecalculateUserSpent(user: UserMemberResponse) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要重新计算用户「${user.username}」的累计消费吗？`,
+      '重新计算累计消费',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await api.recalculateUserSpent(user.id)
+    ElMessage.success('累计消费已重新计算')
+    fetchMemberUsers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('重新计算累计消费失败:', error)
+    }
   }
 }
 </script>

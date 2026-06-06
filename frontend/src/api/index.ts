@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest, MemberLevel, MemberLevelListResponse, MemberLevelCreate, MemberLevelUpdate, UserMemberLevelInfo, UserMemberLevelUpdate, BookMemberPriceResponse, Tag, TagListResponse, TagCreate, TagUpdate, TagNameCheckResponse, TagBookCheckResponse } from '@/types'
+import type { Book, BookListResponse, BookCreate, LoginResponse, User, CartListResponse, CartItemAdd, CartItemUpdate, CartItemSelectedUpdate, CartItemBatchDelete, Order, OrderListResponse, OrderCancel, OrderShip, OrderAdminUpdate, OrderStatus, Coupon, CouponListResponse, CouponCreate, CouponUpdate, UserCouponListResponse, AvailableCouponResponse, CouponClaimResponse, OrderCreateWithCoupon, Author, AuthorListResponse, AuthorCreate, AuthorUpdate, AuthorDetail, AuthorSearchResult, AuthorBookCheckResponse, Publisher, PublisherListResponse, PublisherCreate, PublisherUpdate, PublisherDetail, PublisherSearchResult, PublisherNameCheckResponse, PublisherBookCheckResponse, Message, MessageListResponse, UnreadCountResponse, AnnouncementCreate, MessageStatsResponse, MessageBatchDeleteRequest, MessageStatusFilter, MessageType, DashboardResponse, TimeRange, BookList, BookListListResponse, BookListCreate, BookListUpdate, BookListDetail, BookListAddBooksRequest, BookListUpdateBookRequest, BookListReorderRequest, MemberLevel, MemberLevelListResponse, MemberLevelCreate, MemberLevelUpdate, UserMemberLevelInfo, UserMemberLevelUpdate, UserMemberResponse, UserMemberListResponse, BookMemberPriceResponse, Tag, TagListResponse, TagCreate, TagUpdate, TagNameCheckResponse, TagBookCheckResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 const instance = axios.create({
@@ -260,6 +260,9 @@ export const api = {
 
     reorderBooksInBookList: (id: number, data: BookListReorderRequest): Promise<BookListDetail> =>
         instance.put(`/book-lists/${id}/books/reorder`, data),
+
+    getAdminMemberUsers: (params?: { search?: string; page?: number; page_size?: number }): Promise<UserMemberListResponse> =>
+        instance.get('/member-levels/admin/users', { params }),
 
     getAdminMemberLevels: (params?: { is_active?: boolean; page?: number; page_size?: number }): Promise<MemberLevelListResponse> =>
         instance.get('/member-levels/admin', { params }),

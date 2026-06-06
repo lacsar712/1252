@@ -6,6 +6,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from database import get_db
 from models import MemberLevel, User, Order, OrderStatus
@@ -16,6 +17,8 @@ from schemas import (
     MemberLevelUpdate,
     UserMemberLevelInfo,
     UserMemberLevelUpdate,
+    UserMemberResponse,
+    UserMemberListResponse,
     MemberLevelResponse as MLResponse
 )
 from auth import get_current_active_user, get_current_admin_user
@@ -111,6 +114,44 @@ def _recalculate_user_total_spent(db: Session, user_id: int) -> float:
 
 
 # ========== 管理员API ==========
+@router.get("/admin/users", response_model=UserMemberListResponse)
+def get_admin_users_list(
+    search: Optional[str] = Query(None, description="搜索用户名或邮箱"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """获取用户列表（含会员信息，管理员）"""
+    query = db.query(User)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.username.ilike(search_term),
+                User.email.ilike(search_term)
+            )
+        )
+
+    total = query.count()
+    users = query.order_by(User.id.desc()) \
+        .offset((page - 1) * page_size).limit(page_size).all()
+
+    items = []
+    for user in users:
+        user_resp = UserMemberResponse.model_validate(user)
+        user_resp.member_level = _build_user_member_info(db, user)
+        items.append(user_resp)
+
+    return UserMemberListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=items
+    )
+
+
 @router.get("/admin", response_model=MemberLevelListResponse)
 def get_all_member_levels_admin(
     is_active: Optional[bool] = Query(None, description="启用状态筛选"),
