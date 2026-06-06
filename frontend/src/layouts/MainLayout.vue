@@ -17,6 +17,10 @@
             <el-icon><Collection /></el-icon>
             <span>图书列表</span>
           </router-link>
+          <router-link to="/authors" class="nav-link" active-class="active">
+            <el-icon><EditPen /></el-icon>
+            <span>作者</span>
+          </router-link>
           <router-link to="/book-lists" class="nav-link" active-class="active">
             <el-icon><Notebook /></el-icon>
             <span>主题书单</span>
@@ -125,6 +129,7 @@ import {
   Reading,
   HomeFilled,
   Collection,
+  EditPen,
   List,
   Setting,
   ArrowDown,

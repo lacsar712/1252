@@ -51,6 +51,9 @@
                   </router-link>
                 </span>
               </template>
+              <template v-else-if="book.author">
+                <span class="author-text">{{ book.author }}</span>
+              </template>
               <span v-else class="no-author">暂无作者信息</span>
             </div>
             <div class="meta-item" v-if="book.publisher">
@@ -372,6 +375,10 @@ function handleBuyNow() {
 .no-author {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.author-text {
+  color: var(--text-primary);
 }
 
 .publisher-link {
