@@ -373,7 +373,9 @@ async function checkLoginAndFetch() {
     if (selectedItems.value.length === 0) {
       ElMessage.warning('请先选择要结算的商品')
       router.push('/cart')
+      return
     }
+    await loadCoupons()
   } finally {
     loading.value = false
   }

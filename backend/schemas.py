@@ -432,6 +432,7 @@ class CouponUpdate(BaseModel):
 class CouponResponse(CouponBase):
     id: int
     claimed_quantity: int
+    user_claimed_count: int = Field(0, description="当前用户已领取数量")
     created_at: datetime
     updated_at: datetime
 

@@ -37,9 +37,10 @@
                 type="primary"
                 class="claim-btn"
                 :loading="claimingId === coupon.id"
+                :disabled="coupon.user_claimed_count >= coupon.limit_per_user"
                 @click="handleClaim(coupon.id)"
               >
-                立即领取
+                {{ coupon.user_claimed_count >= coupon.limit_per_user ? '已领取' : '立即领取' }}
               </el-button>
             </div>
           </div>

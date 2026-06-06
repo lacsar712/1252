@@ -71,11 +71,18 @@
 
           <div class="order-footer">
             <div class="order-total">
-              <div v-if="order.discount_amount > 0" class="order-discount">
-                已优惠 ¥{{ order.discount_amount.toFixed(2) }}
-                <el-tag size="small" type="warning" class="coupon-tag">
-                  {{ order.used_coupon?.coupon.name }}
-                </el-tag>
+              <div v-if="order.member_discount_amount > 0 || order.used_coupon" class="order-discount">
+                <template v-if="order.member_discount_amount > 0">
+                  <span class="discount-item">会员优惠 -¥{{ order.member_discount_amount.toFixed(2) }}</span>
+                </template>
+                <template v-if="order.used_coupon">
+                  <span class="discount-item">
+                    券优惠 -¥{{ order.used_coupon.coupon.discount_amount.toFixed(2) }}
+                    <el-tag size="small" type="warning" class="coupon-tag">
+                      {{ order.used_coupon.coupon.name }}
+                    </el-tag>
+                  </span>
+                </template>
               </div>
               <div class="order-total-main">
                 共 {{ order.items.length }} 件商品，
@@ -411,11 +418,17 @@ async function handleCancelOrder(order: Order) {
 
 .order-discount {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   margin-bottom: 8px;
   color: var(--danger-color);
   font-weight: 500;
+}
+
+.discount-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .coupon-tag {

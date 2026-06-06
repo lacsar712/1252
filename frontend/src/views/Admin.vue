@@ -1668,17 +1668,30 @@
                 <div v-if="currentOrder.discount_amount > 0" class="original-amount">
                   原价：<span class="line-through">¥{{ currentOrder.original_amount.toFixed(2) }}</span>
                 </div>
+                <div v-if="currentOrder.member_discount_amount > 0" class="member-discount">
+                  会员优惠：<span class="discount">-¥{{ currentOrder.member_discount_amount.toFixed(2) }}</span>
+                </div>
+                <div v-if="currentOrder.used_coupon" class="coupon-discount">
+                  券优惠：<span class="discount">-¥{{ currentOrder.used_coupon.coupon.discount_amount.toFixed(2) }}</span>
+                </div>
                 <div v-if="currentOrder.discount_amount > 0" class="discount-amount">
-                  优惠：<span class="discount">-¥{{ currentOrder.discount_amount.toFixed(2) }}</span>
+                  共优惠：<span class="discount">-¥{{ currentOrder.discount_amount.toFixed(2) }}</span>
                 </div>
                 <div class="final-amount">
                   实付：<span class="price">¥{{ currentOrder.total_amount.toFixed(2) }}</span>
                 </div>
               </div>
             </el-descriptions-item>
+            <el-descriptions-item v-if="currentOrder.member_level_name" label="会员等级">
+              <el-tag type="warning" size="small">
+                {{ currentOrder.member_level_name }}
+                {{ currentOrder.member_discount_rate ? (currentOrder.member_discount_rate * 10).toFixed(1) + '折' : '' }}
+              </el-tag>
+            </el-descriptions-item>
             <el-descriptions-item v-if="currentOrder.used_coupon" label="使用优惠券">
               <el-tag type="warning" size="small">
                 {{ currentOrder.used_coupon.coupon.name }}
+                (满{{ currentOrder.used_coupon.coupon.threshold_amount }}减{{ currentOrder.used_coupon.coupon.discount_amount }})
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="下单时间">
@@ -3817,6 +3830,14 @@ onMounted(() => {
 .line-through {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+.member-discount {
+  font-size: 12px;
+}
+
+.coupon-discount {
+  font-size: 12px;
 }
 
 .discount-amount {

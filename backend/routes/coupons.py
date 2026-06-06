@@ -76,7 +76,8 @@ def _get_user_coupon_response(
     db: Session,
     user_coupon: UserCoupon,
     total_amount: Optional[float] = None,
-    book_categories: Optional[List[str]] = None
+    book_categories: Optional[List[str]] = None,
+    current_user: Optional[User] = None
 ) -> UserCouponResponse:
     """获取用户优惠券响应对象，包含可用性判断"""
     now = datetime.utcnow()
@@ -103,9 +104,41 @@ def _get_user_coupon_response(
         order_id=user_coupon.order_id,
         used_at=user_coupon.used_at,
         claimed_at=user_coupon.claimed_at,
-        coupon=CouponResponse.model_validate(user_coupon.coupon),
+        coupon=_get_coupon_response(db, user_coupon.coupon, current_user),
         is_available=is_available,
         unavailable_reason=unavailable_reason
+    )
+
+
+def _get_coupon_response(
+    db: Session,
+    coupon: Coupon,
+    current_user: Optional[User] = None
+) -> CouponResponse:
+    """获取优惠券响应对象，包含用户已领数量"""
+    user_claimed_count = 0
+    if current_user:
+        user_claimed_count = db.query(UserCoupon).filter(
+            UserCoupon.coupon_id == coupon.id,
+            UserCoupon.user_id == current_user.id
+        ).count()
+
+    return CouponResponse(
+        id=coupon.id,
+        name=coupon.name,
+        description=coupon.description,
+        threshold_amount=coupon.threshold_amount,
+        discount_amount=coupon.discount_amount,
+        valid_from=coupon.valid_from,
+        valid_to=coupon.valid_to,
+        total_quantity=coupon.total_quantity,
+        claimed_quantity=coupon.claimed_quantity,
+        limit_per_user=coupon.limit_per_user,
+        applicable_categories=coupon.applicable_categories,
+        status=coupon.status,
+        user_claimed_count=user_claimed_count,
+        created_at=coupon.created_at,
+        updated_at=coupon.updated_at
     )
 
 
@@ -145,7 +178,7 @@ def get_all_coupons_admin(
         total=total,
         page=page,
         page_size=page_size,
-        items=[CouponResponse.model_validate(c) for c in coupons]
+        items=[_get_coupon_response(db, c) for c in coupons]
     )
 
 
@@ -164,7 +197,7 @@ def get_coupon_detail_admin(
             detail="优惠券不存在"
         )
 
-    return CouponResponse.model_validate(coupon)
+    return _get_coupon_response(db, coupon)
 
 
 @router.post("", response_model=CouponResponse, status_code=status.HTTP_201_CREATED)
@@ -205,7 +238,7 @@ def create_coupon(
     db.refresh(db_coupon)
 
     logger.info(f"管理员创建优惠券: {current_user.username}, 优惠券: {db_coupon.name}")
-    return CouponResponse.model_validate(db_coupon)
+    return _get_coupon_response(db, db_coupon)
 
 
 @router.put("/{coupon_id}", response_model=CouponResponse)
@@ -250,7 +283,7 @@ def update_coupon(
     db.refresh(coupon)
 
     logger.info(f"管理员更新优惠券: {current_user.username}, 优惠券ID: {coupon_id}")
-    return CouponResponse.model_validate(coupon)
+    return _get_coupon_response(db, coupon)
 
 
 @router.delete("/{coupon_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -310,7 +343,7 @@ def get_available_coupons(
         total=total,
         page=page,
         page_size=page_size,
-        items=[CouponResponse.model_validate(c) for c in coupons]
+        items=[_get_coupon_response(db, c, current_user) for c in coupons]
     )
 
 
@@ -381,7 +414,7 @@ def claim_coupon(
 
     return CouponClaimResponse(
         message="领取成功",
-        user_coupon=_get_user_coupon_response(db, user_coupon)
+        user_coupon=_get_user_coupon_response(db, user_coupon, current_user=current_user)
     )
 
 
@@ -417,7 +450,7 @@ def get_my_coupons(
     total = query.count()
     user_coupons = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    items = [_get_user_coupon_response(db, uc) for uc in user_coupons]
+    items = [_get_user_coupon_response(db, uc, current_user=current_user) for uc in user_coupons]
 
     return UserCouponListResponse(
         total=total,
@@ -471,7 +504,7 @@ def validate_coupons_for_order(
     unavailable: List[UserCouponResponse] = []
 
     for uc in user_coupons:
-        resp = _get_user_coupon_response(db, uc, total_amount, book_categories)
+        resp = _get_user_coupon_response(db, uc, total_amount, book_categories, current_user)
         if resp.is_available:
             available.append(resp)
         else:

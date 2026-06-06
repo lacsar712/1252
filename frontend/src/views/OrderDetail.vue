@@ -172,9 +172,24 @@
             <span>商品总价：</span>
             <span>¥{{ order.original_amount.toFixed(2) }}</span>
           </div>
-          <div v-if="order.discount_amount > 0" class="summary-row discount-row">
+          <div v-if="order.member_level_name" class="summary-row member-level-row">
+            <span>会员等级：</span>
+            <el-tag
+              :color="order.member_level_name ? '#e6a23c' : '#409eff'"
+              effect="dark"
+              size="small"
+            >
+              {{ order.member_level_name }}
+              {{ order.member_discount_rate ? (order.member_discount_rate * 10).toFixed(1) + '折' : '' }}
+            </el-tag>
+          </div>
+          <div v-if="order.member_discount_amount > 0" class="summary-row member-discount-row">
+            <span>会员优惠：</span>
+            <span class="member-discount">-¥{{ order.member_discount_amount.toFixed(2) }}</span>
+          </div>
+          <div v-if="order.used_coupon" class="summary-row discount-row">
             <span>优惠券抵扣：</span>
-            <span class="discount-amount">-¥{{ order.discount_amount.toFixed(2) }}</span>
+            <span class="discount-amount">-¥{{ order.used_coupon.coupon.discount_amount.toFixed(2) }}</span>
           </div>
           <div class="summary-row">
             <span>运费：</span>
@@ -479,6 +494,20 @@ async function handleCancelOrder() {
 
 .free-shipping {
   color: var(--success-color);
+}
+
+.member-level-row {
+  display: flex;
+  align-items: center;
+}
+
+.member-discount-row {
+  color: var(--warning-color);
+}
+
+.member-discount {
+  font-weight: 600;
+  color: var(--danger-color);
 }
 
 .discount-row {

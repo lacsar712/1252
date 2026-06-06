@@ -81,7 +81,7 @@ def _get_order_items_snapshot(db: Session, order_id: int) -> List[OrderItemSnaps
     ]
 
 
-def _get_order_response(db: Session, order: Order) -> OrderResponse:
+def _get_order_response(db: Session, order: Order, current_user: Optional[User] = None) -> OrderResponse:
     """获取订单响应对象"""
     items = _get_order_items_snapshot(db, order.id)
 
@@ -89,6 +89,29 @@ def _get_order_response(db: Session, order: Order) -> OrderResponse:
     if order.user_coupon_id:
         user_coupon = db.query(UserCoupon).filter(UserCoupon.id == order.user_coupon_id).first()
         if user_coupon:
+            coupon = user_coupon.coupon
+            user_id_for_count = current_user.id if current_user else order.user_id
+            user_claimed_count = db.query(UserCoupon).filter(
+                UserCoupon.coupon_id == coupon.id,
+                UserCoupon.user_id == user_id_for_count
+            ).count()
+            coupon_resp = CouponResponse(
+                id=coupon.id,
+                name=coupon.name,
+                description=coupon.description,
+                threshold_amount=coupon.threshold_amount,
+                discount_amount=coupon.discount_amount,
+                valid_from=coupon.valid_from,
+                valid_to=coupon.valid_to,
+                total_quantity=coupon.total_quantity,
+                claimed_quantity=coupon.claimed_quantity,
+                limit_per_user=coupon.limit_per_user,
+                applicable_categories=coupon.applicable_categories,
+                status=coupon.status,
+                user_claimed_count=user_claimed_count,
+                created_at=coupon.created_at,
+                updated_at=coupon.updated_at
+            )
             used_coupon = UserCouponResponse(
                 id=user_coupon.id,
                 coupon_id=user_coupon.coupon_id,
@@ -97,7 +120,7 @@ def _get_order_response(db: Session, order: Order) -> OrderResponse:
                 order_id=user_coupon.order_id,
                 used_at=user_coupon.used_at,
                 claimed_at=user_coupon.claimed_at,
-                coupon=CouponResponse.model_validate(user_coupon.coupon)
+                coupon=coupon_resp
             )
 
     return OrderResponse(
@@ -364,7 +387,7 @@ def create_order(
             log_msg += f", 优惠券优惠 {coupon_discount_amount:.2f}"
         log_msg += f", 实付 {total_amount:.2f}"
         logger.info(log_msg)
-        return _get_order_response(db, db_order)
+        return _get_order_response(db, db_order, current_user)
 
     except HTTPException:
         db.rollback()
@@ -401,7 +424,7 @@ def get_my_orders(
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
-    items = [_get_order_response(db, order) for order in orders]
+    items = [_get_order_response(db, order, current_user) for order in orders]
 
     return OrderListResponse(
         total=total,
@@ -429,7 +452,7 @@ def get_order_detail(
             detail="订单不存在"
         )
 
-    return _get_order_response(db, order)
+    return _get_order_response(db, order, current_user)
 
 
 @router.post("/{order_id}/cancel", response_model=OrderResponse)
@@ -491,7 +514,7 @@ def cancel_order(
         )
 
         logger.info(f"订单取消成功: 用户 {current_user.username}, 订单号 {order.order_no}, 原因: {cancel_data.cancel_reason}")
-        return _get_order_response(db, order)
+        return _get_order_response(db, order, current_user)
 
     except Exception as e:
         db.rollback()

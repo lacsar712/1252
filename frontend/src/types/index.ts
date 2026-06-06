@@ -366,6 +366,7 @@ export interface Coupon {
     valid_to: string
     total_quantity: number
     claimed_quantity: number
+    user_claimed_count: number
     limit_per_user: number
     applicable_categories: string | null
     status: CouponStatus
