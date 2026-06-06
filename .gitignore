@@ -1,31 +1,117 @@
-# Dependencies
-node_modules/
+# =========================
+# Python / FastAPI Backend
+# =========================
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
 venv/
+env/
+ENV/
+# 本地测试用 Python 依赖（pip install --target），勿提交
+.pydeps/
+pydeps/
+backend/.pydeps/
+backend/pydeps/
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.manifest
+*.spec
 
-# Build outputs
+# =========================
+# Node / Vue / Vite Frontend
+# =========================
+node_modules/
 dist/
-build/
+.vite/
+*.local
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+coverage/
+*.tsbuildinfo
+
+# =========================
+# Database & Runtime Data
+# =========================
 *.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
+# =========================
+# Environment & Secrets
+# =========================
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# Logs
+# =========================
+# Logs & Temp Files
+# =========================
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# =========================
+# IDE & Editor
+# =========================
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.iml
+.project
+.classpath
+.settings/
+
+# =========================
+# OS Generated
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =========================
+# Docker (local overrides)
+# =========================
+docker-compose.override.yml
+docker-compose.local.yml
+
+# =========================
+# Build & Package
+# =========================
+build/
+*.tar
+*.zip
+*.gz
